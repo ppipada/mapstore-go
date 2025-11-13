@@ -1,10 +1,10 @@
-package mapdb
+package mapstore
 
 import (
 	"errors"
 	"time"
 
-	"github.com/ppipada/mapdb-go/encdec"
+	"github.com/ppipada/mapstore-go/encdec"
 )
 
 // ErrConflict is returned when flush/delete detects that somebody modified the file since we last read or wrote it.

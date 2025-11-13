@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ppipada/mapdb-go"
-	"github.com/ppipada/mapdb-go/encdec"
+	"github.com/ppipada/mapstore-go"
+	"github.com/ppipada/mapstore-go/encdec"
 )
 
 func TestNewMapFileStore(t *testing.T) {
@@ -21,7 +21,7 @@ func TestNewMapFileStore(t *testing.T) {
 		defaultData       map[string]any
 		createFile        bool
 		fileContent       string
-		options           []mapdb.MapFileStoreOption
+		options           []mapstore.MapFileStoreOption
 		expectError       bool
 		expectedErrorText string
 	}
@@ -30,14 +30,14 @@ func TestNewMapFileStore(t *testing.T) {
 			name:        "File does not exist, createIfNotExists true",
 			filename:    filepath.Join(tempDir, "store1.json"),
 			defaultData: map[string]any{"k": "v"},
-			options:     []mapdb.MapFileStoreOption{mapdb.WithCreateIfNotExists(true)},
+			options:     []mapstore.MapFileStoreOption{mapstore.WithCreateIfNotExists(true)},
 			expectError: false,
 		},
 		{
 			name:              "File does not exist, createIfNotExists false",
 			filename:          filepath.Join(tempDir, "store2.json"),
 			defaultData:       map[string]any{"k": "v"},
-			options:           []mapdb.MapFileStoreOption{mapdb.WithCreateIfNotExists(false)},
+			options:           []mapstore.MapFileStoreOption{mapstore.WithCreateIfNotExists(false)},
 			expectError:       true,
 			expectedErrorText: "does not exist",
 		},
@@ -47,7 +47,7 @@ func TestNewMapFileStore(t *testing.T) {
 			defaultData: map[string]any{"k": "v"},
 			createFile:  true,
 			fileContent: `{"foo":"bar"}`,
-			options:     []mapdb.MapFileStoreOption{},
+			options:     []mapstore.MapFileStoreOption{},
 			expectError: false,
 		},
 		{
@@ -56,7 +56,7 @@ func TestNewMapFileStore(t *testing.T) {
 			defaultData: map[string]any{"k": "v"},
 			createFile:  true,
 			fileContent: `{invalid json}`,
-			options:     []mapdb.MapFileStoreOption{},
+			options:     []mapstore.MapFileStoreOption{},
 			expectError: true,
 		},
 		{
@@ -65,7 +65,7 @@ func TestNewMapFileStore(t *testing.T) {
 			defaultData: map[string]any{"k": "v"},
 			createFile:  true,
 			fileContent: `{"foo":"bar"}`,
-			options:     []mapdb.MapFileStoreOption{},
+			options:     []mapstore.MapFileStoreOption{},
 			expectError: true,
 		},
 	}
@@ -92,7 +92,7 @@ func TestNewMapFileStore(t *testing.T) {
 			}()
 		}
 
-		_, err := mapdb.NewMapFileStore(tt.filename, tt.defaultData, tt.options...)
+		_, err := mapstore.NewMapFileStore(tt.filename, tt.defaultData, tt.options...)
 		if tt.expectError {
 			if err == nil {
 				t.Errorf("[%s] Expected error but got nil", tt.name)
@@ -122,12 +122,12 @@ func TestMapFileStore_SetKey_GetKey(t *testing.T) {
 		"parent.child": encdec.EncryptedStringValueEncoderDecoder{},
 	}
 
-	store, err := mapdb.NewMapFileStore(
+	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		mapdb.WithCreateIfNotExists(true),
+		mapstore.WithCreateIfNotExists(true),
 		// New approach: We pass a function that returns an EncoderDecoder depending on pathSoFar.
-		mapdb.WithValueEncDecGetter(func(pathSoFar []string) encdec.EncoderDecoder {
+		mapstore.WithValueEncDecGetter(func(pathSoFar []string) encdec.EncoderDecoder {
 			joined := strings.Join(pathSoFar, ".")
 			if ed, ok := valueEncDecs[joined]; ok {
 				return ed
@@ -224,7 +224,7 @@ func TestMapFileStore_DeleteKey(t *testing.T) {
 		},
 	}
 
-	store, err := mapdb.NewMapFileStore(filename, initialData, mapdb.WithCreateIfNotExists(true))
+	store, err := mapstore.NewMapFileStore(filename, initialData, mapstore.WithCreateIfNotExists(true))
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
 	}
@@ -303,11 +303,11 @@ func TestMapFileStore_SetAll_GetAll(t *testing.T) {
 	tempDir := t.TempDir()
 	filename := filepath.Join(tempDir, "teststore.json")
 	defaultData := map[string]any{"foo": "bar"}
-	store, err := mapdb.NewMapFileStore(
+	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		mapdb.WithCreateIfNotExists(true),
-		mapdb.WithAutoFlush(true),
+		mapstore.WithCreateIfNotExists(true),
+		mapstore.WithAutoFlush(true),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
@@ -410,7 +410,7 @@ func TestMapFileStore_DeleteAll(t *testing.T) {
 	tempDir := t.TempDir()
 	filename := filepath.Join(tempDir, "teststore.json")
 	defaultData := map[string]any{"foo": "bar"}
-	store, err := mapdb.NewMapFileStore(filename, defaultData, mapdb.WithCreateIfNotExists(true))
+	store, err := mapstore.NewMapFileStore(filename, defaultData, mapstore.WithCreateIfNotExists(true))
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
 	}
@@ -444,11 +444,11 @@ func TestMapFileStore_AutoFlush(t *testing.T) {
 	tempDir := t.TempDir()
 	filename := filepath.Join(tempDir, "teststore_autoflush.json")
 	defaultData := map[string]any{"k": "v"}
-	store, err := mapdb.NewMapFileStore(
+	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		mapdb.WithCreateIfNotExists(true),
-		mapdb.WithAutoFlush(true),
+		mapstore.WithCreateIfNotExists(true),
+		mapstore.WithAutoFlush(true),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
@@ -460,7 +460,7 @@ func TestMapFileStore_AutoFlush(t *testing.T) {
 	}
 
 	// Reopen the store.
-	store2, err := mapdb.NewMapFileStore(filename, defaultData)
+	store2, err := mapstore.NewMapFileStore(filename, defaultData)
 	if err != nil {
 		t.Fatalf("Failed to reopen store: %v", err)
 	}
@@ -478,11 +478,11 @@ func TestMapFileStore_NoAutoFlush(t *testing.T) {
 	tempDir := t.TempDir()
 	filename := filepath.Join(tempDir, "teststore_noautoflush.json")
 	defaultData := map[string]any{"k": "v"}
-	store, err := mapdb.NewMapFileStore(
+	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		mapdb.WithCreateIfNotExists(true),
-		mapdb.WithAutoFlush(false),
+		mapstore.WithCreateIfNotExists(true),
+		mapstore.WithAutoFlush(false),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
@@ -494,7 +494,7 @@ func TestMapFileStore_NoAutoFlush(t *testing.T) {
 	}
 
 	// Reopen the store.
-	store2, err := mapdb.NewMapFileStore(filename, defaultData)
+	store2, err := mapstore.NewMapFileStore(filename, defaultData)
 	if err != nil {
 		t.Fatalf("Failed to reopen store: %v", err)
 	}
@@ -510,7 +510,7 @@ func TestMapFileStore_NoAutoFlush(t *testing.T) {
 		t.Fatalf("Flush failed: %v", err)
 	}
 
-	store3, err := mapdb.NewMapFileStore(filename, defaultData)
+	store3, err := mapstore.NewMapFileStore(filename, defaultData)
 	if err != nil {
 		t.Fatalf("Failed to reopen store after save: %v", err)
 	}
@@ -528,7 +528,7 @@ func TestMapFileStorePermissionErrorCases(t *testing.T) {
 	tempDir := t.TempDir()
 	filename := filepath.Join(tempDir, "teststore_errors.json")
 	defaultData := map[string]any{"k": "v"}
-	store, err := mapdb.NewMapFileStore(filename, defaultData, mapdb.WithCreateIfNotExists(true))
+	store, err := mapstore.NewMapFileStore(filename, defaultData, mapstore.WithCreateIfNotExists(true))
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
 	}
@@ -556,7 +556,7 @@ func TestMapFileStorePermissionErrorCases(t *testing.T) {
 		t.Fatalf("Failed to write invalid data to file: %v", err)
 	}
 
-	_, err = mapdb.NewMapFileStore(filename, defaultData)
+	_, err = mapstore.NewMapFileStore(filename, defaultData)
 	if err == nil {
 		t.Errorf("Expected error when loading store from invalid data, but got nil")
 	}
@@ -566,7 +566,7 @@ func TestMapFileStore_NestedStructures(t *testing.T) {
 	tempDir := t.TempDir()
 	filename := filepath.Join(tempDir, "teststore_nested.json")
 	defaultData := map[string]any{"k": "v"}
-	store, err := mapdb.NewMapFileStore(filename, defaultData, mapdb.WithCreateIfNotExists(true))
+	store, err := mapstore.NewMapFileStore(filename, defaultData, mapstore.WithCreateIfNotExists(true))
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
 	}
@@ -627,7 +627,7 @@ func TestMapFileStore_NestedStructures(t *testing.T) {
 	}
 }
 
-// TestMapFileStore_KeyEncodingDecoding demonstrates how keys are encoded/decoded via mapdb.WithKeyEncDecGetter.
+// TestMapFileStore_KeyEncodingDecoding demonstrates how keys are encoded/decoded via mapstore.WithKeyEncDecGetter.
 // We run table-driven sub-tests that verify:
 //  1. We can set nested keys, then upon store reload, retrieve them with the *original* plain path.
 //  2. If the on-disk data is corrupted (invalid base64 in a key), we get an error when loading.
@@ -645,11 +645,11 @@ func TestMapFileStore_KeyEncodingDecoding(t *testing.T) {
 
 	// Create store with default data and our KeyEncDec.
 	defaultData := map[string]any{"plainKey": "plainVal"}
-	store, err := mapdb.NewMapFileStore(
+	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		mapdb.WithCreateIfNotExists(true),
-		mapdb.WithKeyEncDecGetter(keyEncDecGetter),
+		mapstore.WithCreateIfNotExists(true),
+		mapstore.WithKeyEncDecGetter(keyEncDecGetter),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create store with keyEncDec: %v", err)
@@ -726,10 +726,10 @@ func TestMapFileStore_KeyEncodingDecoding(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unexpected error while flushing: %v", err)
 		}
-		store2, err := mapdb.NewMapFileStore(
+		store2, err := mapstore.NewMapFileStore(
 			filename,
 			defaultData,
-			mapdb.WithKeyEncDecGetter(keyEncDecGetter),
+			mapstore.WithKeyEncDecGetter(keyEncDecGetter),
 		)
 		if err != nil {
 			t.Fatalf("Failed to reopen store after saving: %v", err)
@@ -767,10 +767,10 @@ func TestMapFileStore_KeyEncodingDecoding(t *testing.T) {
 		}
 
 		// Now attempt to open a new store that uses the same KeyEncDec.
-		_, err = mapdb.NewMapFileStore(
+		_, err = mapstore.NewMapFileStore(
 			filename,
 			defaultData,
-			mapdb.WithKeyEncDecGetter(keyEncDecGetter),
+			mapstore.WithKeyEncDecGetter(keyEncDecGetter),
 		)
 		if err == nil {
 			t.Errorf("Expected error when loading invalid base64 key from disk, but got nil")
@@ -791,11 +791,11 @@ func TestMapFileStore_SetAll_KeyEncDec(t *testing.T) {
 	}
 	defaultData := map[string]any{"default": "val"}
 
-	store, err := mapdb.NewMapFileStore(
+	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		mapdb.WithCreateIfNotExists(true),
-		mapdb.WithKeyEncDecGetter(keyEncDecGetter),
+		mapstore.WithCreateIfNotExists(true),
+		mapstore.WithKeyEncDecGetter(keyEncDecGetter),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create store: %v", err)
@@ -860,12 +860,12 @@ func TestEvents_MultipleListeners_IdenticalOrder(t *testing.T) {
 	f := filepath.Join(tmp, "multi.json")
 
 	var aMu, bMu sync.Mutex
-	var recA, recB []mapdb.FileEvent
+	var recA, recB []mapstore.FileEvent
 
-	lA := func(e mapdb.FileEvent) { aMu.Lock(); recA = append(recA, noTime(e)); aMu.Unlock() }
-	lB := func(e mapdb.FileEvent) { bMu.Lock(); recB = append(recB, noTime(e)); bMu.Unlock() }
+	lA := func(e mapstore.FileEvent) { aMu.Lock(); recA = append(recA, noTime(e)); aMu.Unlock() }
+	lB := func(e mapstore.FileEvent) { bMu.Lock(); recB = append(recB, noTime(e)); bMu.Unlock() }
 
-	st := openStore(f, mapdb.WithListeners(lA, lB))
+	st := openStore(f, mapstore.WithListeners(lA, lB))
 
 	_ = st.SetAll(map[string]any{"x": 1})
 	_ = st.SetKey([]string{"x"}, 2)
@@ -892,17 +892,17 @@ func TestEvents_AutoFlushFalse(t *testing.T) {
 	tmp := t.TempDir()
 	f := filepath.Join(tmp, "noflush.json")
 
-	var ev mapdb.FileEvent
+	var ev mapstore.FileEvent
 	st := openStore(
 		f,
-		mapdb.WithAutoFlush(false),
-		mapdb.WithListeners(func(e mapdb.FileEvent) { ev = noTime(e) }),
+		mapstore.WithAutoFlush(false),
+		mapstore.WithListeners(func(e mapstore.FileEvent) { ev = noTime(e) }),
 	)
 
 	if err := st.SetKey([]string{key}, val); err != nil {
 		t.Fatalf("SetKey: %v", err)
 	}
-	if ev.Op != mapdb.OpSetKey || ev.NewValue != val {
+	if ev.Op != mapstore.OpSetKey || ev.NewValue != val {
 		t.Fatalf("unexpected event %+v", ev)
 	}
 
@@ -928,8 +928,8 @@ func TestEvents_DataSnapshotMatchesStore(t *testing.T) {
 	tmp := t.TempDir()
 	f := filepath.Join(tmp, "datasnap.json")
 
-	var ev mapdb.FileEvent
-	st := openStore(f, mapdb.WithListeners(func(e mapdb.FileEvent) { ev = noTime(e) }))
+	var ev mapstore.FileEvent
+	st := openStore(f, mapstore.WithListeners(func(e mapstore.FileEvent) { ev = noTime(e) }))
 
 	steps := []struct {
 		name string
@@ -972,10 +972,10 @@ func TestEvents_ConcurrentWrites(t *testing.T) {
 	f := filepath.Join(tmp, "concurrent.json")
 
 	var mu sync.Mutex
-	var evs []mapdb.FileEvent
+	var evs []mapstore.FileEvent
 	st := openStore(
 		f,
-		mapdb.WithListeners(func(e mapdb.FileEvent) {
+		mapstore.WithListeners(func(e mapstore.FileEvent) {
 			mu.Lock()
 			evs = append(evs, noTime(e))
 			mu.Unlock()
@@ -1000,7 +1000,7 @@ func TestEvents_ConcurrentWrites(t *testing.T) {
 		t.Fatalf("expected %d events, got %d", n, len(evs))
 	}
 	for _, e := range evs {
-		if e.Op != mapdb.OpSetKey {
+		if e.Op != mapstore.OpSetKey {
 			t.Fatalf("unexpected op %v", e.Op)
 		}
 	}
@@ -1018,10 +1018,10 @@ func TestEvents_PanicListener_DoesNotBreakNextListeners(t *testing.T) {
 	f := filepath.Join(tmp, "isolate.json")
 
 	var called bool
-	lGood := func(mapdb.FileEvent) { called = true }
-	lBad := func(mapdb.FileEvent) { panic("bad") }
+	lGood := func(mapstore.FileEvent) { called = true }
+	lBad := func(mapstore.FileEvent) { panic("bad") }
 
-	st := openStore(f, mapdb.WithListeners(lBad, lGood))
+	st := openStore(f, mapstore.WithListeners(lBad, lGood))
 
 	if err := st.SetKey([]string{"x"}, 1); err != nil {
 		t.Fatalf("SetKey: %v", err)
@@ -1031,11 +1031,11 @@ func TestEvents_PanicListener_DoesNotBreakNextListeners(t *testing.T) {
 	}
 }
 
-func openStore(p string, opts ...mapdb.MapFileStoreOption) *mapdb.MapFileStore {
-	s, err := mapdb.NewMapFileStore(
+func openStore(p string, opts ...mapstore.MapFileStoreOption) *mapstore.MapFileStore {
+	s, err := mapstore.NewMapFileStore(
 		p,
 		map[string]any{},
-		append(opts, mapdb.WithCreateIfNotExists(true))...,
+		append(opts, mapstore.WithCreateIfNotExists(true))...,
 	)
 	if err != nil {
 		panic(err)
@@ -1057,7 +1057,7 @@ func getValueAtPath(m map[string]any, path []string) any {
 	return current
 }
 
-func noTime(e mapdb.FileEvent) mapdb.FileEvent { e.Timestamp = time.Time{}; return e }
+func noTime(e mapstore.FileEvent) mapstore.FileEvent { e.Timestamp = time.Time{}; return e }
 
 // deepEqual is a simple helper function to compare two any values for equality.
 func deepEqual(a, b any) bool {

@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ppipada/mapdb-go"
+	"github.com/ppipada/mapstore-go"
 )
 
 // ListDirs returns a paginated and sorted list of directories in the base directory.
@@ -31,9 +31,9 @@ func ListDirs(
 
 	// Sort partitions.
 	switch strings.ToLower(sortOrder) {
-	case mapdb.SortOrderAscending:
+	case mapstore.SortOrderAscending:
 		sort.Strings(dirs)
-	case mapdb.SortOrderDescending:
+	case mapstore.SortOrderDescending:
 		sort.Sort(sort.Reverse(sort.StringSlice(dirs)))
 	default:
 		return nil, "", fmt.Errorf("invalid sort order: %s", sortOrder)

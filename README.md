@@ -1,6 +1,6 @@
-# MapDB for Go
+# MapStore for Go
 
-MapDB is a local, filesystem‑backed map database with pluggable codecs (JSON or custom), with optional per‑key encryption via the OS keyring, and optional full‑text search via SQLite FTS5.
+MapStore is a local, filesystem‑backed map database with pluggable codecs (JSON or custom), with optional per‑key encryption via the OS keyring, and optional full‑text search via SQLite FTS5.
 
 ## Features
 
@@ -27,7 +27,7 @@ MapDB is a local, filesystem‑backed map database with pluggable codecs (JSON o
 ## Installation
 
 ```bash
-go get github.com/ppipada/mapdb-go
+go get github.com/ppipada/mapstore-go
 ```
 
 ## Quick Start
@@ -42,7 +42,7 @@ import (
 "fmt"
 "log"
 
-    "github.com/ppipada/mapdb-go/filestore"
+    "github.com/ppipada/mapstore-go/filestore"
 
 )
 
@@ -84,7 +84,7 @@ import (
   "log"
   "time"
 
-  "github.com/ppipada/mapdb-go/dirstore"
+  "github.com/ppipada/mapstore-go/dirstore"
 )
 
 func main() {
@@ -122,7 +122,7 @@ import (
   "fmt"
   "log"
 
-  "github.com/ppipada/mapdb-go/ftsengine"
+  "github.com/ppipada/mapstore-go/ftsengine"
 )
 
 func main() {
@@ -142,13 +142,13 @@ func main() {
 
   ctx := context.Background()
   if err := engine.Upsert(ctx, "doc-1", map[string]string{
-    "title": "MapDB introduction",
-    "body":  "MapDB keeps JSON maps on disk with optional full text search.",
+    "title": "MapStore introduction",
+    "body":  "MapStore keeps JSON maps on disk with optional full text search.",
   }); err != nil {
     log.Fatal(err)
   }
 
-  hits, _, err := engine.Search(ctx, "MapDB search", "", 5)
+  hits, _, err := engine.Search(ctx, "MapStore search", "", 5)
   if err != nil {
     log.Fatal(err)
   }
@@ -172,4 +172,4 @@ func main() {
 
 ## License
 
-MapDB is released under the [MIT License](LICENSE).
+MapStore is released under the [MIT License](LICENSE).

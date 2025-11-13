@@ -1,12 +1,12 @@
 package dirpartition
 
-import "github.com/ppipada/mapdb-go"
+import "github.com/ppipada/mapstore-go"
 
 // NoPartitionProvider is a default implementation that treats the base directory as a single partition.
 type NoPartitionProvider struct{}
 
 // GetPartitionDir returns an empty string, indicating no partitioning.
-func (p *NoPartitionProvider) GetPartitionDir(_ mapdb.FileKey) (string, error) {
+func (p *NoPartitionProvider) GetPartitionDir(_ mapstore.FileKey) (string, error) {
 	return "", nil
 }
 

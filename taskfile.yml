@@ -3,7 +3,7 @@
 version: "3"
 
 vars:
-  GREETING: Hello, these are MapDB tasks!
+  GREETING: Hello, these are MapStore tasks!
 
 tasks:
   default:

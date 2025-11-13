@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ppipada/mapdb-go"
+	"github.com/ppipada/mapstore-go"
 )
 
 // TimeExtractor is a function that returns the creation time of a file.
-type TimeExtractor func(key mapdb.FileKey) (time.Time, error)
+type TimeExtractor func(key mapstore.FileKey) (time.Time, error)
 
 // MonthPartitionProvider decides directories yyyyMM from TimeExtractor.
 type MonthPartitionProvider struct {
@@ -16,7 +16,7 @@ type MonthPartitionProvider struct {
 }
 
 // GetPartitionDir implements the PartitionProvider interface.
-func (p *MonthPartitionProvider) GetPartitionDir(key mapdb.FileKey) (string, error) {
+func (p *MonthPartitionProvider) GetPartitionDir(key mapstore.FileKey) (string, error) {
 	t, err := p.TimeFn(key)
 	if err != nil {
 		return "", fmt.Errorf("could not get time for file: %s err: %w", key.FileName, err)

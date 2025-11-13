@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ppipada/mapdb-go"
-	"github.com/ppipada/mapdb-go/dirpartition"
+	"github.com/ppipada/mapstore-go"
+	"github.com/ppipada/mapstore-go/dirpartition"
 )
 
 // CRUD Tests.
@@ -19,7 +19,7 @@ func TestMapDirectoryStore_CRUD(t *testing.T) {
 	now := time.Now()
 	tests := []struct {
 		name               string
-		partitionProvider  mapdb.PartitionProvider
+		partitionProvider  mapstore.PartitionProvider
 		filename           string
 		data               map[string]any
 		expectedPartition  string
@@ -38,7 +38,7 @@ func TestMapDirectoryStore_CRUD(t *testing.T) {
 		{
 			name: "dirpartition.MonthPartitionProvider - Create File",
 			partitionProvider: &dirpartition.MonthPartitionProvider{
-				TimeFn: func(fileKey mapdb.FileKey) (time.Time, error) { return now, nil },
+				TimeFn: func(fileKey mapstore.FileKey) (time.Time, error) { return now, nil },
 			},
 			filename:           "testfile.json",
 			data:               map[string]any{"key": "value"},
@@ -70,7 +70,7 @@ func TestMapDirectoryStore_CRUD(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			baseDir := t.TempDir()
-			mds, err := mapdb.NewMapDirectoryStore(
+			mds, err := mapstore.NewMapDirectoryStore(
 				baseDir,
 				true,
 				tt.partitionProvider,
@@ -79,7 +79,7 @@ func TestMapDirectoryStore_CRUD(t *testing.T) {
 				t.Fatalf("failed to create MapDirectoryStore: %v", err)
 			}
 
-			err = mds.SetFileData(mapdb.FileKey{FileName: tt.filename}, tt.data)
+			err = mds.SetFileData(mapstore.FileKey{FileName: tt.filename}, tt.data)
 			if tt.expectError {
 				if err == nil {
 					t.Fatalf("expected error but got none")
@@ -105,7 +105,7 @@ func TestMapDirectoryStore_CRUD(t *testing.T) {
 			}
 
 			if tt.expectedFileExists {
-				data, err := mds.GetFileData(mapdb.FileKey{FileName: tt.filename}, false)
+				data, err := mds.GetFileData(mapstore.FileKey{FileName: tt.filename}, false)
 				if err != nil {
 					t.Fatalf("failed to get file data: %v", err)
 				}
@@ -125,7 +125,7 @@ func TestMapDirectoryStore_CRUD(t *testing.T) {
 func TestMapDirectoryStore_DeleteFile(t *testing.T) {
 	t.Parallel()
 	baseDir := t.TempDir()
-	mds, err := mapdb.NewMapDirectoryStore(
+	mds, err := mapstore.NewMapDirectoryStore(
 		baseDir,
 		true,
 		&dirpartition.NoPartitionProvider{},
@@ -135,7 +135,7 @@ func TestMapDirectoryStore_DeleteFile(t *testing.T) {
 	}
 
 	filename := "testfile.json"
-	err = mds.SetFileData(mapdb.FileKey{FileName: filename}, map[string]any{"key": "value"})
+	err = mds.SetFileData(mapstore.FileKey{FileName: filename}, map[string]any{"key": "value"})
 	if err != nil {
 		t.Fatalf("failed to set file data: %v", err)
 	}
@@ -146,7 +146,7 @@ func TestMapDirectoryStore_DeleteFile(t *testing.T) {
 		t.Fatalf("expected file to exist but it does not")
 	}
 
-	err = mds.DeleteFile(mapdb.FileKey{FileName: filename})
+	err = mds.DeleteFile(mapstore.FileKey{FileName: filename})
 	if err != nil {
 		t.Fatalf("failed to delete file: %v", err)
 	}
@@ -162,9 +162,9 @@ func TestMapDirectoryStore_DeleteFile(t *testing.T) {
 func TestMapDirectoryStore_ListFiles_BasicAndSort(t *testing.T) {
 	baseDir := t.TempDir()
 	partitionProvider := &dirpartition.MonthPartitionProvider{
-		TimeFn: func(filekey mapdb.FileKey) (time.Time, error) { return time.Now(), nil },
+		TimeFn: func(filekey mapstore.FileKey) (time.Time, error) { return time.Now(), nil },
 	}
-	mds, err := mapdb.NewMapDirectoryStore(
+	mds, err := mapstore.NewMapDirectoryStore(
 		baseDir,
 		true,
 		partitionProvider,
@@ -175,7 +175,7 @@ func TestMapDirectoryStore_ListFiles_BasicAndSort(t *testing.T) {
 
 	files := []string{"file1.json", "file2.json", "file3.json"}
 	for _, filename := range files {
-		if err := mds.SetFileData(mapdb.FileKey{FileName: filename}, map[string]any{"key": "value"}); err != nil {
+		if err := mds.SetFileData(mapstore.FileKey{FileName: filename}, map[string]any{"key": "value"}); err != nil {
 			t.Fatalf("failed to set file data: %v", err)
 		}
 	}
@@ -188,12 +188,12 @@ func TestMapDirectoryStore_ListFiles_BasicAndSort(t *testing.T) {
 	}{
 		{
 			name:          "Ascending",
-			sortOrder:     mapdb.SortOrderAscending,
+			sortOrder:     mapstore.SortOrderAscending,
 			expectedFiles: files,
 		},
 		{
 			name:          "Descending",
-			sortOrder:     mapdb.SortOrderDescending,
+			sortOrder:     mapstore.SortOrderDescending,
 			expectedFiles: []string{"file3.json", "file2.json", "file1.json"},
 		},
 		{
@@ -205,7 +205,7 @@ func TestMapDirectoryStore_ListFiles_BasicAndSort(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			files, _, err := mds.ListFiles(mapdb.ListingConfig{SortOrder: tt.sortOrder}, "")
+			files, _, err := mds.ListFiles(mapstore.ListingConfig{SortOrder: tt.sortOrder}, "")
 			if tt.expectError {
 				if err == nil {
 					t.Fatalf("expected error but got none")
@@ -261,7 +261,7 @@ func TestMapDirectoryStore_ListFiles_NoPartitionProvider_Pagination(t *testing.T
 	}{
 		{
 			name:      "Ascending",
-			sortOrder: mapdb.SortOrderAscending,
+			sortOrder: mapstore.SortOrderAscending,
 			pageSize:  4,
 			expectedPages: [][]string{
 				{"file1.json", "file2.json", "file3.json", "file4.json"},
@@ -271,7 +271,7 @@ func TestMapDirectoryStore_ListFiles_NoPartitionProvider_Pagination(t *testing.T
 		},
 		{
 			name:      "Descending",
-			sortOrder: mapdb.SortOrderDescending,
+			sortOrder: mapstore.SortOrderDescending,
 			pageSize:  4,
 			expectedPages: [][]string{
 				{"file9.json", "file8.json", "file7.json", "file6.json"},
@@ -284,18 +284,18 @@ func TestMapDirectoryStore_ListFiles_NoPartitionProvider_Pagination(t *testing.T
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			pageToken := ""
-			mds, err := mapdb.NewMapDirectoryStore(
+			mds, err := mapstore.NewMapDirectoryStore(
 				baseDir,
 				true,
 				&dirpartition.NoPartitionProvider{},
-				mapdb.WithPageSize(tt.pageSize),
+				mapstore.WithPageSize(tt.pageSize),
 			)
 			if err != nil {
 				t.Fatalf("failed to create MapDirectoryStore: %v", err)
 			}
 			for pageIndex, expectedFiles := range tt.expectedPages {
 				files, nextPageToken, err := mds.ListFiles(
-					mapdb.ListingConfig{SortOrder: tt.sortOrder},
+					mapstore.ListingConfig{SortOrder: tt.sortOrder},
 					pageToken,
 				)
 				if err != nil {
@@ -356,7 +356,7 @@ func TestMapDirectoryStore_ListFiles_MultiPartition_Pagination(t *testing.T) {
 	}{
 		{
 			name:      "Ascending",
-			sortOrder: mapdb.SortOrderAscending,
+			sortOrder: mapstore.SortOrderAscending,
 			pageSize:  4,
 			expectedPages: [][]string{
 				{
@@ -382,7 +382,7 @@ func TestMapDirectoryStore_ListFiles_MultiPartition_Pagination(t *testing.T) {
 		},
 		{
 			name:      "Descending",
-			sortOrder: mapdb.SortOrderDescending,
+			sortOrder: mapstore.SortOrderDescending,
 			pageSize:  4,
 			expectedPages: [][]string{
 				{
@@ -413,19 +413,19 @@ func TestMapDirectoryStore_ListFiles_MultiPartition_Pagination(t *testing.T) {
 			pageToken := ""
 			for pageIndex, expectedFiles := range tt.expectedPages {
 				partitionProvider := &dirpartition.MonthPartitionProvider{
-					TimeFn: func(filekey mapdb.FileKey) (time.Time, error) { return time.Now(), nil },
+					TimeFn: func(filekey mapstore.FileKey) (time.Time, error) { return time.Now(), nil },
 				}
-				mds, err := mapdb.NewMapDirectoryStore(
+				mds, err := mapstore.NewMapDirectoryStore(
 					baseDir,
 					true,
 					partitionProvider,
-					mapdb.WithPageSize(tt.pageSize),
+					mapstore.WithPageSize(tt.pageSize),
 				)
 				if err != nil {
 					t.Fatalf("failed to create MapDirectoryStore: %v", err)
 				}
 				files, nextPageToken, err := mds.ListFiles(
-					mapdb.ListingConfig{SortOrder: tt.sortOrder},
+					mapstore.ListingConfig{SortOrder: tt.sortOrder},
 					pageToken,
 				)
 				if err != nil {
@@ -464,13 +464,13 @@ func TestMapDirectoryStore_ListFiles_FilteredPartitions(t *testing.T) {
 	createFiles(t, baseDir, partitions, files)
 
 	partitionProvider := &dirpartition.MonthPartitionProvider{
-		TimeFn: func(filekey mapdb.FileKey) (time.Time, error) { return time.Now(), nil },
+		TimeFn: func(filekey mapstore.FileKey) (time.Time, error) { return time.Now(), nil },
 	}
-	mds, err := mapdb.NewMapDirectoryStore(
+	mds, err := mapstore.NewMapDirectoryStore(
 		baseDir,
 		true,
 		partitionProvider,
-		mapdb.WithPageSize(10),
+		mapstore.WithPageSize(10),
 	)
 	if err != nil {
 		t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -484,7 +484,7 @@ func TestMapDirectoryStore_ListFiles_FilteredPartitions(t *testing.T) {
 	}{
 		{
 			name:             "Non-filtered, ascending",
-			sortOrder:        mapdb.SortOrderAscending,
+			sortOrder:        mapstore.SortOrderAscending,
 			filterPartitions: nil,
 			expectedFiles: []string{
 				"202301/a.json", "202301/b.json", "202301/c.json",
@@ -494,7 +494,7 @@ func TestMapDirectoryStore_ListFiles_FilteredPartitions(t *testing.T) {
 		},
 		{
 			name:             "Non-filtered, descending",
-			sortOrder:        mapdb.SortOrderDescending,
+			sortOrder:        mapstore.SortOrderDescending,
 			filterPartitions: nil,
 			expectedFiles: []string{
 				"202303/c.json", "202303/b.json", "202303/a.json",
@@ -504,13 +504,13 @@ func TestMapDirectoryStore_ListFiles_FilteredPartitions(t *testing.T) {
 		},
 		{
 			name:             "Filtered, single partition",
-			sortOrder:        mapdb.SortOrderAscending,
+			sortOrder:        mapstore.SortOrderAscending,
 			filterPartitions: []string{"202302"},
 			expectedFiles:    []string{"202302/a.json", "202302/b.json", "202302/c.json"},
 		},
 		{
 			name:             "Filtered, multiple partitions, custom order",
-			sortOrder:        mapdb.SortOrderAscending,
+			sortOrder:        mapstore.SortOrderAscending,
 			filterPartitions: []string{"202303", "202301"},
 			expectedFiles: []string{
 				"202303/a.json", "202303/b.json", "202303/c.json",
@@ -519,7 +519,7 @@ func TestMapDirectoryStore_ListFiles_FilteredPartitions(t *testing.T) {
 		},
 		{
 			name:             "Filtered, multiple partitions, descending",
-			sortOrder:        mapdb.SortOrderDescending,
+			sortOrder:        mapstore.SortOrderDescending,
 			filterPartitions: []string{"202302", "202301"},
 			expectedFiles: []string{
 				"202302/c.json", "202302/b.json", "202302/a.json",
@@ -528,7 +528,7 @@ func TestMapDirectoryStore_ListFiles_FilteredPartitions(t *testing.T) {
 		},
 		{
 			name:             "Filtered, empty partition list",
-			sortOrder:        mapdb.SortOrderAscending,
+			sortOrder:        mapstore.SortOrderAscending,
 			filterPartitions: []string{},
 			expectedFiles: []string{
 				"202301/a.json", "202301/b.json", "202301/c.json",
@@ -541,7 +541,7 @@ func TestMapDirectoryStore_ListFiles_FilteredPartitions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			files, nextPageToken, err := mds.ListFiles(
-				mapdb.ListingConfig{SortOrder: tt.sortOrder, FilterPartitions: tt.filterPartitions},
+				mapstore.ListingConfig{SortOrder: tt.sortOrder, FilterPartitions: tt.filterPartitions},
 				"",
 			)
 			if err != nil {
@@ -569,14 +569,14 @@ func TestMapDirectoryStore_ListFiles_FilteredPartitions_Pagination(t *testing.T)
 	createFiles(t, baseDir, partitions, files)
 
 	partitionProvider := &dirpartition.MonthPartitionProvider{
-		TimeFn: func(filekey mapdb.FileKey) (time.Time, error) { return time.Now(), nil },
+		TimeFn: func(filekey mapstore.FileKey) (time.Time, error) { return time.Now(), nil },
 	}
 	pageSize := 3
-	mds, err := mapdb.NewMapDirectoryStore(
+	mds, err := mapstore.NewMapDirectoryStore(
 		baseDir,
 		true,
 		partitionProvider,
-		mapdb.WithPageSize(pageSize),
+		mapstore.WithPageSize(pageSize),
 	)
 	if err != nil {
 		t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -590,7 +590,7 @@ func TestMapDirectoryStore_ListFiles_FilteredPartitions_Pagination(t *testing.T)
 	}{
 		{
 			name:             "Filtered, paginated, asc",
-			sortOrder:        mapdb.SortOrderAscending,
+			sortOrder:        mapstore.SortOrderAscending,
 			filterPartitions: []string{"202301", "202302"},
 			expectedPages: [][]string{
 				{"202301/a.json", "202301/b.json", "202301/c.json"},
@@ -600,7 +600,7 @@ func TestMapDirectoryStore_ListFiles_FilteredPartitions_Pagination(t *testing.T)
 		},
 		{
 			name:             "Filtered, paginated, desc",
-			sortOrder:        mapdb.SortOrderDescending,
+			sortOrder:        mapstore.SortOrderDescending,
 			filterPartitions: []string{"202302", "202301"},
 			expectedPages: [][]string{
 				{"202302/d.json", "202302/c.json", "202302/b.json"},
@@ -615,7 +615,7 @@ func TestMapDirectoryStore_ListFiles_FilteredPartitions_Pagination(t *testing.T)
 			pageToken := ""
 			for pageIdx, wantFiles := range tt.expectedPages {
 				files, nextPageToken, err := mds.ListFiles(
-					mapdb.ListingConfig{SortOrder: tt.sortOrder, FilterPartitions: tt.filterPartitions},
+					mapstore.ListingConfig{SortOrder: tt.sortOrder, FilterPartitions: tt.filterPartitions},
 					pageToken,
 				)
 				if err != nil {
@@ -656,13 +656,13 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering(t *testing.T) {
 	createFiles(t, baseDir, partitions, files)
 
 	partitionProvider := &dirpartition.MonthPartitionProvider{
-		TimeFn: func(filekey mapdb.FileKey) (time.Time, error) { return time.Now(), nil },
+		TimeFn: func(filekey mapstore.FileKey) (time.Time, error) { return time.Now(), nil },
 	}
-	mds, err := mapdb.NewMapDirectoryStore(
+	mds, err := mapstore.NewMapDirectoryStore(
 		baseDir,
 		true,
 		partitionProvider,
-		mapdb.WithPageSize(20),
+		mapstore.WithPageSize(20),
 	)
 	if err != nil {
 		t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -678,7 +678,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering(t *testing.T) {
 	}{
 		{
 			name:           "No prefix, ascending",
-			sortOrder:      mapdb.SortOrderAscending,
+			sortOrder:      mapstore.SortOrderAscending,
 			filenamePrefix: "",
 			want: want{files: []string{
 				"202301/apple.json", "202301/apple_pie.json", "202301/apricot.json", "202301/banana.json", "202301/banana_bread.json", "202301/berry.json", "202301/berry_tart.json", "202301/cherry.json", "202301/zebra.json",
@@ -687,7 +687,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering(t *testing.T) {
 		},
 		{
 			name:           "Prefix 'apple', ascending",
-			sortOrder:      mapdb.SortOrderAscending,
+			sortOrder:      mapstore.SortOrderAscending,
 			filenamePrefix: "apple",
 			want: want{files: []string{
 				"202301/apple.json", "202301/apple_pie.json",
@@ -696,7 +696,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering(t *testing.T) {
 		},
 		{
 			name:           "Prefix 'banana', ascending",
-			sortOrder:      mapdb.SortOrderAscending,
+			sortOrder:      mapstore.SortOrderAscending,
 			filenamePrefix: "banana",
 			want: want{files: []string{
 				"202301/banana.json", "202301/banana_bread.json",
@@ -705,7 +705,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering(t *testing.T) {
 		},
 		{
 			name:           "Prefix 'berry', descending",
-			sortOrder:      mapdb.SortOrderDescending,
+			sortOrder:      mapstore.SortOrderDescending,
 			filenamePrefix: "berry",
 			want: want{files: []string{
 				"202302/berry_tart.json", "202302/berry.json",
@@ -714,7 +714,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering(t *testing.T) {
 		},
 		{
 			name:           "Prefix 'z', ascending",
-			sortOrder:      mapdb.SortOrderAscending,
+			sortOrder:      mapstore.SortOrderAscending,
 			filenamePrefix: "z",
 			want: want{files: []string{
 				"202301/zebra.json", "202302/zebra.json",
@@ -722,13 +722,13 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering(t *testing.T) {
 		},
 		{
 			name:           "Prefix 'notfound', ascending",
-			sortOrder:      mapdb.SortOrderAscending,
+			sortOrder:      mapstore.SortOrderAscending,
 			filenamePrefix: "notfound",
 			want:           want{files: []string{}},
 		},
 		{
 			name:             "Prefix '', filtered partition",
-			sortOrder:        mapdb.SortOrderAscending,
+			sortOrder:        mapstore.SortOrderAscending,
 			filterPartitions: []string{"202301"},
 			filenamePrefix:   "",
 			want: want{files: []string{
@@ -737,7 +737,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering(t *testing.T) {
 		},
 		{
 			name:             "Prefix 'ap', filtered partition",
-			sortOrder:        mapdb.SortOrderAscending,
+			sortOrder:        mapstore.SortOrderAscending,
 			filterPartitions: []string{"202302"},
 			filenamePrefix:   "ap",
 			want: want{files: []string{
@@ -746,7 +746,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering(t *testing.T) {
 		},
 		{
 			name:             "Prefix 'berry', filtered partition, descending",
-			sortOrder:        mapdb.SortOrderDescending,
+			sortOrder:        mapstore.SortOrderDescending,
 			filterPartitions: []string{"202301"},
 			filenamePrefix:   "berry",
 			want: want{files: []string{
@@ -755,7 +755,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering(t *testing.T) {
 		},
 		{
 			name:           "Prefix with underscore",
-			sortOrder:      mapdb.SortOrderAscending,
+			sortOrder:      mapstore.SortOrderAscending,
 			filenamePrefix: "banana_",
 			want: want{files: []string{
 				"202301/banana_bread.json", "202302/banana_bread.json",
@@ -763,7 +763,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering(t *testing.T) {
 		},
 		{
 			name:           "Prefix with special char",
-			sortOrder:      mapdb.SortOrderAscending,
+			sortOrder:      mapstore.SortOrderAscending,
 			filenamePrefix: "apple_",
 			want: want{files: []string{
 				"202301/apple_pie.json", "202302/apple_pie.json",
@@ -774,7 +774,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			files, nextPageToken, err := mds.ListFiles(
-				mapdb.ListingConfig{
+				mapstore.ListingConfig{
 					SortOrder:        tt.sortOrder,
 					FilterPartitions: tt.filterPartitions,
 					FilenamePrefix:   tt.filenamePrefix,
@@ -809,14 +809,14 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering_Pagination(t *testi
 	createFiles(t, baseDir, partitions, files)
 
 	partitionProvider := &dirpartition.MonthPartitionProvider{
-		TimeFn: func(filekey mapdb.FileKey) (time.Time, error) { return time.Now(), nil },
+		TimeFn: func(filekey mapstore.FileKey) (time.Time, error) { return time.Now(), nil },
 	}
 	pageSize := 2
-	mds, err := mapdb.NewMapDirectoryStore(
+	mds, err := mapstore.NewMapDirectoryStore(
 		baseDir,
 		true,
 		partitionProvider,
-		mapdb.WithPageSize(pageSize),
+		mapstore.WithPageSize(pageSize),
 	)
 	if err != nil {
 		t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -831,7 +831,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering_Pagination(t *testi
 	}{
 		{
 			name:           "Prefix 'apple', ascending, paginated",
-			sortOrder:      mapdb.SortOrderAscending,
+			sortOrder:      mapstore.SortOrderAscending,
 			filenamePrefix: "apple",
 			expectedPages: []pageWant{
 				{files: []string{"202301/apple.json", "202301/apple_pie.json"}},
@@ -839,7 +839,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering_Pagination(t *testi
 		},
 		{
 			name:           "Prefix 'b', ascending, paginated",
-			sortOrder:      mapdb.SortOrderAscending,
+			sortOrder:      mapstore.SortOrderAscending,
 			filenamePrefix: "b",
 			expectedPages: []pageWant{
 				{files: []string{"202301/banana.json", "202301/banana_bread.json"}},
@@ -848,7 +848,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering_Pagination(t *testi
 		},
 		{
 			name:           "Prefix 'berry', ascending, paginated",
-			sortOrder:      mapdb.SortOrderAscending,
+			sortOrder:      mapstore.SortOrderAscending,
 			filenamePrefix: "berry",
 			expectedPages: []pageWant{
 				{files: []string{"202301/berry.json", "202301/berry_tart.json"}},
@@ -856,7 +856,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering_Pagination(t *testi
 		},
 		{
 			name:           "Prefix 'z', ascending, paginated",
-			sortOrder:      mapdb.SortOrderAscending,
+			sortOrder:      mapstore.SortOrderAscending,
 			filenamePrefix: "z",
 			expectedPages: []pageWant{
 				{files: []string{"202301/zebra.json"}},
@@ -864,7 +864,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering_Pagination(t *testi
 		},
 		{
 			name:           "Prefix '', ascending, paginated",
-			sortOrder:      mapdb.SortOrderAscending,
+			sortOrder:      mapstore.SortOrderAscending,
 			filenamePrefix: "",
 			expectedPages: []pageWant{
 				{files: []string{"202301/apple.json", "202301/apple_pie.json"}},
@@ -881,7 +881,7 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering_Pagination(t *testi
 			pageToken := ""
 			for pageIdx, want := range tt.expectedPages {
 				files, nextPageToken, err := mds.ListFiles(
-					mapdb.ListingConfig{
+					mapstore.ListingConfig{
 						SortOrder:      tt.sortOrder,
 						FilenamePrefix: tt.filenamePrefix,
 					},
@@ -927,9 +927,9 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering_Pagination(t *testi
 func TestMapDirectoryStore_ListPartitions_Pagination(t *testing.T) {
 	baseDir := t.TempDir()
 	partitionProvider := &dirpartition.MonthPartitionProvider{
-		TimeFn: func(filekey mapdb.FileKey) (time.Time, error) { return time.Now(), nil },
+		TimeFn: func(filekey mapstore.FileKey) (time.Time, error) { return time.Now(), nil },
 	}
-	mds, err := mapdb.NewMapDirectoryStore(
+	mds, err := mapstore.NewMapDirectoryStore(
 		baseDir,
 		true,
 		partitionProvider,
@@ -955,14 +955,14 @@ func TestMapDirectoryStore_ListPartitions_Pagination(t *testing.T) {
 	}{
 		{
 			name:          "Ascending",
-			sortOrder:     mapdb.SortOrderAscending,
+			sortOrder:     mapstore.SortOrderAscending,
 			pageToken:     "",
 			pageSize:      2,
 			expectedParts: []string{"202301", "202302"},
 		},
 		{
 			name:          "Descending",
-			sortOrder:     mapdb.SortOrderDescending,
+			sortOrder:     mapstore.SortOrderDescending,
 			pageToken:     "",
 			pageSize:      2,
 			expectedParts: []string{"202303", "202302"},
@@ -1019,13 +1019,13 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 	t.Parallel()
 
 	partitionProvider := &dirpartition.MonthPartitionProvider{
-		TimeFn: func(filekey mapdb.FileKey) (time.Time, error) { return time.Now(), nil },
+		TimeFn: func(filekey mapstore.FileKey) (time.Time, error) { return time.Now(), nil },
 	}
 
 	t.Run("InvalidSortOrder", func(t *testing.T) {
 		t.Parallel()
 		baseDir := t.TempDir()
-		mds, err := mapdb.NewMapDirectoryStore(
+		mds, err := mapstore.NewMapDirectoryStore(
 			baseDir,
 			true,
 			partitionProvider,
@@ -1033,7 +1033,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
 		}
-		_, _, err = mds.ListFiles(mapdb.ListingConfig{SortOrder: "notasort"}, "")
+		_, _, err = mds.ListFiles(mapstore.ListingConfig{SortOrder: "notasort"}, "")
 		if err == nil {
 			t.Fatal("expected error for invalid sort order, got nil")
 		}
@@ -1042,7 +1042,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 	t.Run("NonExistentPartition", func(t *testing.T) {
 		t.Parallel()
 		baseDir := t.TempDir()
-		mds, err := mapdb.NewMapDirectoryStore(
+		mds, err := mapstore.NewMapDirectoryStore(
 			baseDir,
 			true,
 			partitionProvider,
@@ -1051,8 +1051,8 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
 		}
 		files, nextPageToken, err := mds.ListFiles(
-			mapdb.ListingConfig{
-				SortOrder:        mapdb.SortOrderAscending,
+			mapstore.ListingConfig{
+				SortOrder:        mapstore.SortOrderAscending,
 				FilterPartitions: []string{"doesnotexist"},
 			},
 			"",
@@ -1074,7 +1074,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 	t.Run("UnreadablePartitionDir", func(t *testing.T) {
 		t.Parallel()
 		baseDir := t.TempDir()
-		mds, err := mapdb.NewMapDirectoryStore(
+		mds, err := mapstore.NewMapDirectoryStore(
 			baseDir,
 			true,
 			partitionProvider,
@@ -1089,7 +1089,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 		}
 		defer func() { _ = os.Chmod(dir, 0o755) }()
 		_, _, err = mds.ListFiles(
-			mapdb.ListingConfig{SortOrder: mapdb.SortOrderAscending, FilterPartitions: []string{partition}}, "",
+			mapstore.ListingConfig{SortOrder: mapstore.SortOrderAscending, FilterPartitions: []string{partition}}, "",
 		)
 		if err != nil {
 			t.Fatalf(
@@ -1102,7 +1102,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 	t.Run("InvalidPageToken", func(t *testing.T) {
 		t.Parallel()
 		baseDir := t.TempDir()
-		mds, err := mapdb.NewMapDirectoryStore(
+		mds, err := mapstore.NewMapDirectoryStore(
 			baseDir,
 			true,
 			partitionProvider,
@@ -1110,12 +1110,12 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
 		}
-		_, _, err = mds.ListFiles(mapdb.ListingConfig{SortOrder: mapdb.SortOrderAscending}, "notbase64!")
+		_, _, err = mds.ListFiles(mapstore.ListingConfig{SortOrder: mapstore.SortOrderAscending}, "notbase64!")
 		if err == nil {
 			t.Fatal("expected error for invalid base64 page token, got nil")
 		}
 		bad := base64.StdEncoding.EncodeToString([]byte("notjson"))
-		_, _, err = mds.ListFiles(mapdb.ListingConfig{SortOrder: mapdb.SortOrderAscending}, bad)
+		_, _, err = mds.ListFiles(mapstore.ListingConfig{SortOrder: mapstore.SortOrderAscending}, bad)
 		if err == nil {
 			t.Fatal("expected error for invalid JSON page token, got nil")
 		}
@@ -1124,7 +1124,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 	t.Run("CorruptedPageToken", func(t *testing.T) {
 		t.Parallel()
 		baseDir := t.TempDir()
-		mds, err := mapdb.NewMapDirectoryStore(
+		mds, err := mapstore.NewMapDirectoryStore(
 			baseDir,
 			true,
 			partitionProvider,
@@ -1133,7 +1133,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
 		}
 		bad := base64.StdEncoding.EncodeToString([]byte("{notjson:"))
-		_, _, err = mds.ListFiles(mapdb.ListingConfig{SortOrder: mapdb.SortOrderAscending}, bad)
+		_, _, err = mds.ListFiles(mapstore.ListingConfig{SortOrder: mapstore.SortOrderAscending}, bad)
 		if err == nil {
 			t.Fatal("expected error for corrupted JSON page token, got nil")
 		}
@@ -1142,7 +1142,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 	t.Run("EmptyBaseDir", func(t *testing.T) {
 		t.Parallel()
 		baseDir := t.TempDir()
-		mds, err := mapdb.NewMapDirectoryStore(
+		mds, err := mapstore.NewMapDirectoryStore(
 			baseDir,
 			true,
 			partitionProvider,
@@ -1150,7 +1150,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
 		}
-		files, nextPageToken, err := mds.ListFiles(mapdb.ListingConfig{SortOrder: mapdb.SortOrderAscending}, "")
+		files, nextPageToken, err := mds.ListFiles(mapstore.ListingConfig{SortOrder: mapstore.SortOrderAscending}, "")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1165,7 +1165,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 	t.Run("FilterWithNonExistentPartition", func(t *testing.T) {
 		t.Parallel()
 		baseDir := t.TempDir()
-		mds, err := mapdb.NewMapDirectoryStore(
+		mds, err := mapstore.NewMapDirectoryStore(
 			baseDir,
 			true,
 			partitionProvider,
@@ -1177,8 +1177,8 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 		files := []string{"a.json"}
 		createFiles(t, baseDir, partitions, files)
 		_, _, err = mds.ListFiles(
-			mapdb.ListingConfig{
-				SortOrder:        mapdb.SortOrderAscending,
+			mapstore.ListingConfig{
+				SortOrder:        mapstore.SortOrderAscending,
 				FilterPartitions: []string{"202301", "doesnotexist"},
 			},
 			"",
@@ -1197,16 +1197,16 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 		partitions := []string{"202303"}
 		files := []string{"a.json", "b.json"}
 		createFiles(t, baseDir, partitions, files)
-		mds, err := mapdb.NewMapDirectoryStore(
+		mds, err := mapstore.NewMapDirectoryStore(
 			baseDir,
 			true,
 			partitionProvider,
-			mapdb.WithPageSize(10),
+			mapstore.WithPageSize(10),
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
 		}
-		got, nextPageToken, err := mds.ListFiles(mapdb.ListingConfig{SortOrder: mapdb.SortOrderAscending}, "")
+		got, nextPageToken, err := mds.ListFiles(mapstore.ListingConfig{SortOrder: mapstore.SortOrderAscending}, "")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -1224,7 +1224,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 		partitions := []string{"202305"}
 		files := []string{"a.json"}
 		createFiles(t, baseDir, partitions, files)
-		mds, err := mapdb.NewMapDirectoryStore(
+		mds, err := mapstore.NewMapDirectoryStore(
 			baseDir,
 			true,
 			partitionProvider,
@@ -1233,7 +1233,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
 		}
 		got, nextPageToken, err := mds.ListFiles(
-			mapdb.ListingConfig{SortOrder: mapdb.SortOrderAscending, FilterPartitions: []string{}}, "",
+			mapstore.ListingConfig{SortOrder: mapstore.SortOrderAscending, FilterPartitions: []string{}}, "",
 		)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -1252,7 +1252,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 		partitions := []string{"202306"}
 		files := []string{"apple.json", "banana.json"}
 		createFiles(t, baseDir, partitions, files)
-		mds, err := mapdb.NewMapDirectoryStore(
+		mds, err := mapstore.NewMapDirectoryStore(
 			baseDir,
 			true,
 			partitionProvider,
@@ -1261,7 +1261,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
 		}
 		got, nextPageToken, err := mds.ListFiles(
-			mapdb.ListingConfig{SortOrder: mapdb.SortOrderAscending, FilenamePrefix: "zzz"}, "",
+			mapstore.ListingConfig{SortOrder: mapstore.SortOrderAscending, FilenamePrefix: "zzz"}, "",
 		)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -1282,18 +1282,18 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(baseDir, "202302"), 0o755); err != nil {
 			t.Fatalf("failed to create partition dir: %v", err)
 		}
-		mds, err := mapdb.NewMapDirectoryStore(
+		mds, err := mapstore.NewMapDirectoryStore(
 			baseDir,
 			true,
 			partitionProvider,
-			mapdb.WithPageSize(1),
+			mapstore.WithPageSize(1),
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
 		}
 		files1, nextPageToken, err := mds.ListFiles(
-			mapdb.ListingConfig{
-				SortOrder:        mapdb.SortOrderAscending,
+			mapstore.ListingConfig{
+				SortOrder:        mapstore.SortOrderAscending,
 				FilterPartitions: []string{"202307", "202302"},
 			},
 			"",
@@ -1317,18 +1317,18 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(baseDir, "202309"), 0o755); err != nil {
 			t.Fatalf("failed to create partition dir: %v", err)
 		}
-		mds, err := mapdb.NewMapDirectoryStore(
+		mds, err := mapstore.NewMapDirectoryStore(
 			baseDir,
 			true,
 			partitionProvider,
-			mapdb.WithPageSize(1),
+			mapstore.WithPageSize(1),
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
 		}
 		files1, nextPageToken, err := mds.ListFiles(
-			mapdb.ListingConfig{
-				SortOrder:        mapdb.SortOrderAscending,
+			mapstore.ListingConfig{
+				SortOrder:        mapstore.SortOrderAscending,
 				FilterPartitions: []string{"202308", "202309"},
 				FilenamePrefix:   "apple",
 			}, "",

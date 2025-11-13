@@ -1,4 +1,4 @@
-module github.com/ppipada/mapdb-go
+module github.com/ppipada/mapstore-go
 
 go 1.25.3
 

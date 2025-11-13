@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ppipada/mapdb-go"
+	"github.com/ppipada/mapstore-go"
 )
 
 // Below is your simple "reverse string" EncoderDecoder for demonstration.
@@ -38,7 +38,7 @@ func (e reverseStringEncoderDecoder) Decode(r io.Reader, v any) error {
 }
 
 type operation interface {
-	Execute(t *testing.T, store *mapdb.MapFileStore)
+	Execute(t *testing.T, store *mapstore.MapFileStore)
 }
 
 type setKeyOperation struct {
@@ -46,7 +46,7 @@ type setKeyOperation struct {
 	value any
 }
 
-func (op setKeyOperation) Execute(t *testing.T, store *mapdb.MapFileStore) {
+func (op setKeyOperation) Execute(t *testing.T, store *mapstore.MapFileStore) {
 	t.Helper()
 	if err := store.SetKey(strings.Split(op.key, "."), op.value); err != nil {
 		t.Errorf("failed to set key %s: %v", op.key, err)
@@ -58,7 +58,7 @@ type getKeyOperation struct {
 	expectedValue any
 }
 
-func (op getKeyOperation) Execute(t *testing.T, store *mapdb.MapFileStore) {
+func (op getKeyOperation) Execute(t *testing.T, store *mapstore.MapFileStore) {
 	t.Helper()
 	val, err := store.GetKey(strings.Split(op.key, "."))
 	if err != nil {

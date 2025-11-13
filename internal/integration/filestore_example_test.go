@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ppipada/mapdb-go"
-	"github.com/ppipada/mapdb-go/encdec"
-	"github.com/ppipada/mapdb-go/internal/maputil"
+	"github.com/ppipada/mapstore-go"
+	"github.com/ppipada/mapstore-go/encdec"
+	"github.com/ppipada/mapstore-go/internal/maputil"
 )
 
 func TestMapFileStore(t *testing.T) {
@@ -57,14 +57,14 @@ func TestMapFileStore(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create a temporary file.
 			tempDir := t.TempDir()
-			filename := filepath.Join(tempDir, "simplemapdb_test.json")
+			filename := filepath.Join(tempDir, "mapstore_test.json")
 
-			// Create store with initial data, using the new mapdb.WithValueEncDecGetter.
-			store, err := mapdb.NewMapFileStore(
+			// Create store with initial data, using the new mapstore.WithValueEncDecGetter.
+			store, err := mapstore.NewMapFileStore(
 				filename,
 				tt.initialData,
-				mapdb.WithCreateIfNotExists(true),
-				mapdb.WithValueEncDecGetter(func(pathSoFar []string) encdec.EncoderDecoder {
+				mapstore.WithCreateIfNotExists(true),
+				mapstore.WithValueEncDecGetter(func(pathSoFar []string) encdec.EncoderDecoder {
 					joined := strings.Join(pathSoFar, ".")
 					if ed, ok := tt.keyEncDecs[joined]; ok {
 						return ed
@@ -148,11 +148,11 @@ func TestMapFileStore(t *testing.T) {
 			}
 
 			// Now, create a new store from the file (using the same approach).
-			newStore, err := mapdb.NewMapFileStore(
+			newStore, err := mapstore.NewMapFileStore(
 				filename,
 				tt.initialData,
-				mapdb.WithCreateIfNotExists(false),
-				mapdb.WithValueEncDecGetter(func(pathSoFar []string) encdec.EncoderDecoder {
+				mapstore.WithCreateIfNotExists(false),
+				mapstore.WithValueEncDecGetter(func(pathSoFar []string) encdec.EncoderDecoder {
 					joined := strings.Join(pathSoFar, ".")
 					if ed, ok := tt.keyEncDecs[joined]; ok {
 						return ed
@@ -268,8 +268,8 @@ func Example_events_basicFlow() {
 
 	// Record every event we receive.
 	var mu sync.Mutex
-	var got []mapdb.FileEvent
-	rec := func(e mapdb.FileEvent) {
+	var got []mapstore.FileEvent
+	rec := func(e mapstore.FileEvent) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -279,12 +279,12 @@ func Example_events_basicFlow() {
 		got = append(got, e)
 	}
 
-	store, _ := mapdb.NewMapFileStore(
+	store, _ := mapstore.NewMapFileStore(
 		file,
 		// No default data.
 		nil,
-		mapdb.WithCreateIfNotExists(true),
-		mapdb.WithListeners(rec),
+		mapstore.WithCreateIfNotExists(true),
+		mapstore.WithListeners(rec),
 	)
 
 	_ = store.SetAll(map[string]any{"a": 1})
@@ -296,11 +296,11 @@ func Example_events_basicFlow() {
 	mu.Lock()
 	for _, ev := range got {
 		switch ev.Op {
-		case mapdb.OpSetFile:
+		case mapstore.OpSetFile:
 			fmt.Printf("%s -> %v\n", ev.Op, ev.Data)
-		case mapdb.OpResetFile:
+		case mapstore.OpResetFile:
 			fmt.Printf("%s\n", ev.Op)
-		case mapdb.OpDeleteFile, mapdb.OpSetKey, mapdb.OpDeleteKey:
+		case mapstore.OpDeleteFile, mapstore.OpSetKey, mapstore.OpDeleteKey:
 			fmt.Printf("%s %v  old=%v  new=%v\n",
 				ev.Op, ev.Keys, ev.OldValue, ev.NewValue)
 		}
@@ -322,29 +322,29 @@ func Example_events_autoFlush() {
 	defer os.RemoveAll(tmp)
 	file := filepath.Join(tmp, "store.json")
 
-	var last mapdb.FileEvent
-	listener := func(e mapdb.FileEvent) { last = e }
+	var last mapstore.FileEvent
+	listener := func(e mapstore.FileEvent) { last = e }
 
-	st, _ := mapdb.NewMapFileStore(
+	st, _ := mapstore.NewMapFileStore(
 		file,
 		nil,
-		mapdb.WithCreateIfNotExists(true),
-		mapdb.WithAutoFlush(false),
-		mapdb.WithListeners(listener),
+		mapstore.WithCreateIfNotExists(true),
+		mapstore.WithAutoFlush(false),
+		mapstore.WithListeners(listener),
 	)
 
 	_ = st.SetKey([]string{"unsaved"}, 123)
 	fmt.Println("event op:", last.Op)
 
 	// Re-open the file - the key is not there yet.
-	reopen1, _ := mapdb.NewMapFileStore(file, nil)
+	reopen1, _ := mapstore.NewMapFileStore(file, nil)
 	if _, err := reopen1.GetKey([]string{"unsaved"}); err != nil {
 		fmt.Println("not on disk yet")
 	}
 
 	// Flush and try again.
 	_ = st.Flush()
-	reopen2, _ := mapdb.NewMapFileStore(file, nil)
+	reopen2, _ := mapstore.NewMapFileStore(file, nil)
 	v, _ := reopen2.GetKey([]string{"unsaved"})
 	fmt.Println("on disk after flush:", v)
 
@@ -361,15 +361,15 @@ func Example_events_panicIsolation() {
 	defer os.RemoveAll(tmp)
 	file := filepath.Join(tmp, "store.json")
 
-	bad := func(mapdb.FileEvent) { panic("boom") }
+	bad := func(mapstore.FileEvent) { panic("boom") }
 	var goodCalled bool
-	good := func(mapdb.FileEvent) { goodCalled = true }
+	good := func(mapstore.FileEvent) { goodCalled = true }
 
-	st, _ := mapdb.NewMapFileStore(
+	st, _ := mapstore.NewMapFileStore(
 		file,
 		nil,
-		mapdb.WithCreateIfNotExists(true),
-		mapdb.WithListeners(bad, good),
+		mapstore.WithCreateIfNotExists(true),
+		mapstore.WithListeners(bad, good),
 	)
 
 	_ = st.SetKey([]string{"x"}, 1)

@@ -1,4 +1,4 @@
-package mapdb
+package mapstore
 
 import (
 	"bytes"
@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ppipada/mapdb-go/encdec"
-	"github.com/ppipada/mapdb-go/internal/maputil"
+	"github.com/ppipada/mapstore-go/encdec"
+	"github.com/ppipada/mapstore-go/internal/maputil"
 )
 
 const maxSetAllRetries = 3

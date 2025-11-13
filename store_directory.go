@@ -1,4 +1,4 @@
-package mapdb
+package mapstore
 
 import (
 	"encoding/base64"
@@ -151,7 +151,7 @@ func (mds *MapDirectoryStore) Open(
 		}
 	}
 
-	// Create a new Map
+	// Create a new Map.
 	store, err = NewMapFileStore(
 		filePath,
 		defaultData,
