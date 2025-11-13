@@ -13,30 +13,50 @@ import (
 	"sync"
 )
 
+const (
+	SortOrderAscending  = "asc"
+	SortOrderDescending = "desc"
+)
+
+var ErrCannotReadPartitionDir = errors.New("failed to read partition directory")
+
+type FileKey struct {
+	FileName string
+	XAttr    any
+}
+
+// PartitionProvider defines an interface for determining the partition directory for a file.
+type PartitionProvider interface {
+	GetPartitionDir(key FileKey) (string, error)
+	ListPartitions(baseDir, sortOrder, pageToken string,
+		pageSize int) (partitions []string, nextPageToken string, err error)
+}
+
 // MapDirectoryStore manages multiple MapFileStores within a directory.
 type MapDirectoryStore struct {
-	baseDir           string
-	pageSize          int
-	PartitionProvider PartitionProvider
-	listeners         []FileListener
+	baseDir            string
+	pageSize           int
+	partitionProvider  PartitionProvider
+	listeners          []FileListener
+	fileEncoderDecoder IOEncoderDecoder
 
 	// OpenStores caches open MapFileStore instances per file path.
 	openStores map[string]*MapFileStore
 	openMu     sync.Mutex
 }
 
-// MapDirectoryStoreOption is a functional option for configuring the MapDirectoryStore.
-type MapDirectoryStoreOption func(*MapDirectoryStore)
+// DirOption is a functional option for configuring the MapDirectoryStore.
+type DirOption func(*MapDirectoryStore)
 
-// WithPageSize sets the default page size for pagination.
-func WithPageSize(size int) MapDirectoryStoreOption {
+// WithDirPageSize sets the default page size for pagination.
+func WithDirPageSize(size int) DirOption {
 	return func(mds *MapDirectoryStore) {
 		mds.pageSize = size
 	}
 }
 
-// WithFileListeners registers one or more listeners when the directory store is created.
-func WithFileListeners(ls ...FileListener) MapDirectoryStoreOption {
+// WithDirFileListeners registers one or more listeners when the directory store is created.
+func WithDirFileListeners(ls ...FileListener) DirOption {
 	return func(mds *MapDirectoryStore) {
 		mds.listeners = append(mds.listeners, ls...)
 	}
@@ -47,8 +67,15 @@ func NewMapDirectoryStore(
 	baseDir string,
 	createIfNotExists bool,
 	partitionProvider PartitionProvider,
-	opts ...MapDirectoryStoreOption,
+	fileEncoderDecoder IOEncoderDecoder,
+	opts ...DirOption,
 ) (*MapDirectoryStore, error) {
+	if partitionProvider == nil {
+		return nil, errors.New("invalid partition provider")
+	}
+	if fileEncoderDecoder == nil {
+		return nil, errors.New("invalid file encoder decoder")
+	}
 	// Resolve the base directory path.
 	baseDir, err := filepath.Abs(baseDir)
 	if err != nil {
@@ -67,10 +94,11 @@ func NewMapDirectoryStore(
 	}
 
 	mds := &MapDirectoryStore{
-		baseDir:           baseDir,
-		pageSize:          10,
-		PartitionProvider: partitionProvider,
-		openStores:        make(map[string]*MapFileStore),
+		baseDir:            baseDir,
+		pageSize:           10,
+		partitionProvider:  partitionProvider,
+		fileEncoderDecoder: fileEncoderDecoder,
+		openStores:         make(map[string]*MapFileStore),
 	}
 
 	for _, opt := range opts {
@@ -86,7 +114,7 @@ func (mds *MapDirectoryStore) SetFileData(fileKey FileKey, data map[string]any) 
 	if data == nil {
 		return fmt.Errorf("invalid request for file: %s", fileKey.FileName)
 	}
-	store, err := mds.Open(fileKey, true, data)
+	store, err := mds.OpenFile(fileKey, true, data)
 	if err != nil {
 		return err
 	}
@@ -100,7 +128,7 @@ func (mds *MapDirectoryStore) GetFileData(
 	forceFetch bool,
 ) (map[string]any, error) {
 	// Use a dummy defaultData for opening if file exists.
-	store, err := mds.Open(fileKey, false, map[string]any{})
+	store, err := mds.OpenFile(fileKey, false, map[string]any{})
 	if err != nil {
 		return nil, err
 	}
@@ -110,7 +138,7 @@ func (mds *MapDirectoryStore) GetFileData(
 // DeleteFile removes the file with the given filename from the base directory.
 // It is a thin wrapper around Open and DeleteFile.
 func (mds *MapDirectoryStore) DeleteFile(fileKey FileKey) error {
-	store, err := mds.Open(fileKey, false, map[string]any{})
+	store, err := mds.OpenFile(fileKey, false, map[string]any{})
 	if err != nil {
 		return err
 	}
@@ -118,12 +146,12 @@ func (mds *MapDirectoryStore) DeleteFile(fileKey FileKey) error {
 	if err := store.DeleteFile(); err != nil {
 		return err
 	}
-	return mds.Close(fileKey)
+	return mds.CloseFile(fileKey)
 }
 
-// Open returns a cached or newly created MapFileStore for the given FileKey.
+// OpenFile returns a cached or newly created MapFileStore for the given FileKey.
 // It is concurrency-safe and ensures only one instance per file path.
-func (mds *MapDirectoryStore) Open(
+func (mds *MapDirectoryStore) OpenFile(
 	fileKey FileKey,
 	createIfNotExists bool,
 	defaultData map[string]any,
@@ -155,8 +183,9 @@ func (mds *MapDirectoryStore) Open(
 	store, err = NewMapFileStore(
 		filePath,
 		defaultData,
+		mds.fileEncoderDecoder,
 		WithCreateIfNotExists(createIfNotExists),
-		WithListeners(mds.listeners...),
+		WithFileListeners(mds.listeners...),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file store for %s: %w", fileKey.FileName, err)
@@ -167,8 +196,8 @@ func (mds *MapDirectoryStore) Open(
 	return store, nil
 }
 
-// Close closes the MapFileStore for the given FileKey (if it was opened) and removes it from the cache.
-func (mds *MapDirectoryStore) Close(fileKey FileKey) error {
+// CloseFile closes the MapFileStore for the given FileKey (if it was opened) and removes it from the cache.
+func (mds *MapDirectoryStore) CloseFile(fileKey FileKey) error {
 	filePath, err := mds.validateAndGetFilePath(fileKey)
 	if err != nil {
 		return err
@@ -204,6 +233,13 @@ func (mds *MapDirectoryStore) CloseAll() error {
 		}
 	}
 	return firstErr
+}
+
+func (mds *MapDirectoryStore) ListPartitions(
+	baseDir, sortOrder, pageToken string,
+	pageSize int,
+) (partitions []string, nextPageToken string, err error) {
+	return mds.partitionProvider.ListPartitions(baseDir, sortOrder, pageToken, pageSize)
 }
 
 // ListingConfig holds all options for listing files.
@@ -285,7 +321,7 @@ func (mds *MapDirectoryStore) ListFiles(
 			}
 			partitionName = pfpt.FilterPartitions[pfpt.PartitionIndex]
 		} else {
-			partitions, nextToken, err := mds.PartitionProvider.ListPartitions(
+			partitions, nextToken, err := mds.partitionProvider.ListPartitions(
 				mds.baseDir,
 				token.SortOrder,
 				token.PartitionListingPageToken,
@@ -307,7 +343,7 @@ func (mds *MapDirectoryStore) ListFiles(
 			token.SortOrder,
 			token.FilenamePrefix,
 		)
-		if err != nil && errors.Is(err, ErrCannotReadPartition) {
+		if err != nil && errors.Is(err, ErrCannotReadPartitionDir) {
 			slog.Debug("skipping listing partition", "error", err)
 			token.PartitionFilterPageToken.PartitionIndex++
 		} else if err != nil {
@@ -366,7 +402,7 @@ func (mds *MapDirectoryStore) readPartitionFiles(
 ) ([]os.FileInfo, error) {
 	files, err := os.ReadDir(partitionPath)
 	if err != nil {
-		return nil, fmt.Errorf("partition %s: %w", partitionPath, ErrCannotReadPartition)
+		return nil, fmt.Errorf("partition %s: %w", partitionPath, ErrCannotReadPartitionDir)
 	}
 
 	var fileInfos []os.FileInfo
@@ -406,7 +442,7 @@ func (mds *MapDirectoryStore) validateAndGetFilePath(fileKey FileKey) (string, e
 			fileKey.FileName,
 		)
 	}
-	partitionDir, err := mds.PartitionProvider.GetPartitionDir(fileKey)
+	partitionDir, err := mds.partitionProvider.GetPartitionDir(fileKey)
 	if err != nil {
 		return "", fmt.Errorf(
 			"could not get partition dir for file: %s, err: %w",

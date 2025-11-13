@@ -34,3 +34,4 @@ go.work.sum
 out
 dist
 ignored.txt
+godepgraph.png

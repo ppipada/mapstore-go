@@ -10,6 +10,7 @@ import (
 
 	"github.com/ppipada/mapstore-go"
 	"github.com/ppipada/mapstore-go/dirpartition"
+	"github.com/ppipada/mapstore-go/encdec"
 )
 
 // CRUD Tests.
@@ -74,6 +75,7 @@ func TestMapDirectoryStore_CRUD(t *testing.T) {
 				baseDir,
 				true,
 				tt.partitionProvider,
+				encdec.JSONEncoderDecoder{},
 			)
 			if err != nil {
 				t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -129,6 +131,7 @@ func TestMapDirectoryStore_DeleteFile(t *testing.T) {
 		baseDir,
 		true,
 		&dirpartition.NoPartitionProvider{},
+		encdec.JSONEncoderDecoder{},
 	)
 	if err != nil {
 		t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -168,6 +171,7 @@ func TestMapDirectoryStore_ListFiles_BasicAndSort(t *testing.T) {
 		baseDir,
 		true,
 		partitionProvider,
+		encdec.JSONEncoderDecoder{},
 	)
 	if err != nil {
 		t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -288,7 +292,8 @@ func TestMapDirectoryStore_ListFiles_NoPartitionProvider_Pagination(t *testing.T
 				baseDir,
 				true,
 				&dirpartition.NoPartitionProvider{},
-				mapstore.WithPageSize(tt.pageSize),
+				encdec.JSONEncoderDecoder{},
+				mapstore.WithDirPageSize(tt.pageSize),
 			)
 			if err != nil {
 				t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -419,7 +424,8 @@ func TestMapDirectoryStore_ListFiles_MultiPartition_Pagination(t *testing.T) {
 					baseDir,
 					true,
 					partitionProvider,
-					mapstore.WithPageSize(tt.pageSize),
+					encdec.JSONEncoderDecoder{},
+					mapstore.WithDirPageSize(tt.pageSize),
 				)
 				if err != nil {
 					t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -470,7 +476,8 @@ func TestMapDirectoryStore_ListFiles_FilteredPartitions(t *testing.T) {
 		baseDir,
 		true,
 		partitionProvider,
-		mapstore.WithPageSize(10),
+		encdec.JSONEncoderDecoder{},
+		mapstore.WithDirPageSize(10),
 	)
 	if err != nil {
 		t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -576,7 +583,8 @@ func TestMapDirectoryStore_ListFiles_FilteredPartitions_Pagination(t *testing.T)
 		baseDir,
 		true,
 		partitionProvider,
-		mapstore.WithPageSize(pageSize),
+		encdec.JSONEncoderDecoder{},
+		mapstore.WithDirPageSize(pageSize),
 	)
 	if err != nil {
 		t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -662,7 +670,8 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering(t *testing.T) {
 		baseDir,
 		true,
 		partitionProvider,
-		mapstore.WithPageSize(20),
+		encdec.JSONEncoderDecoder{},
+		mapstore.WithDirPageSize(20),
 	)
 	if err != nil {
 		t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -816,7 +825,8 @@ func TestMapDirectoryStore_ListFiles_FilenamePrefixFiltering_Pagination(t *testi
 		baseDir,
 		true,
 		partitionProvider,
-		mapstore.WithPageSize(pageSize),
+		encdec.JSONEncoderDecoder{},
+		mapstore.WithDirPageSize(pageSize),
 	)
 	if err != nil {
 		t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -933,6 +943,7 @@ func TestMapDirectoryStore_ListPartitions_Pagination(t *testing.T) {
 		baseDir,
 		true,
 		partitionProvider,
+		encdec.JSONEncoderDecoder{},
 	)
 	if err != nil {
 		t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -978,7 +989,7 @@ func TestMapDirectoryStore_ListPartitions_Pagination(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			partitions, nextPageToken, err := mds.PartitionProvider.ListPartitions(
+			partitions, nextPageToken, err := mds.ListPartitions(
 				baseDir, tt.sortOrder, tt.pageToken, tt.pageSize,
 			)
 			if tt.expectError {
@@ -999,7 +1010,7 @@ func TestMapDirectoryStore_ListPartitions_Pagination(t *testing.T) {
 				}
 			}
 			if nextPageToken != "" {
-				partitions, _, err = mds.PartitionProvider.ListPartitions(
+				partitions, _, err = mds.ListPartitions(
 					baseDir, tt.sortOrder, nextPageToken, tt.pageSize,
 				)
 				if err != nil {
@@ -1029,6 +1040,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			baseDir,
 			true,
 			partitionProvider,
+			encdec.JSONEncoderDecoder{},
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -1046,6 +1058,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			baseDir,
 			true,
 			partitionProvider,
+			encdec.JSONEncoderDecoder{},
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -1078,6 +1091,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			baseDir,
 			true,
 			partitionProvider,
+			encdec.JSONEncoderDecoder{},
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -1106,6 +1120,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			baseDir,
 			true,
 			partitionProvider,
+			encdec.JSONEncoderDecoder{},
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -1128,6 +1143,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			baseDir,
 			true,
 			partitionProvider,
+			encdec.JSONEncoderDecoder{},
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -1146,6 +1162,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			baseDir,
 			true,
 			partitionProvider,
+			encdec.JSONEncoderDecoder{},
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -1169,6 +1186,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			baseDir,
 			true,
 			partitionProvider,
+			encdec.JSONEncoderDecoder{},
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -1201,7 +1219,8 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			baseDir,
 			true,
 			partitionProvider,
-			mapstore.WithPageSize(10),
+			encdec.JSONEncoderDecoder{},
+			mapstore.WithDirPageSize(10),
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -1228,6 +1247,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			baseDir,
 			true,
 			partitionProvider,
+			encdec.JSONEncoderDecoder{},
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -1256,6 +1276,7 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			baseDir,
 			true,
 			partitionProvider,
+			encdec.JSONEncoderDecoder{},
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -1286,7 +1307,8 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			baseDir,
 			true,
 			partitionProvider,
-			mapstore.WithPageSize(1),
+			encdec.JSONEncoderDecoder{},
+			mapstore.WithDirPageSize(1),
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)
@@ -1321,7 +1343,8 @@ func TestMapDirectoryStore_ListFiles_ErrorsAndEdgeCases(t *testing.T) {
 			baseDir,
 			true,
 			partitionProvider,
-			mapstore.WithPageSize(1),
+			encdec.JSONEncoderDecoder{},
+			mapstore.WithDirPageSize(1),
 		)
 		if err != nil {
 			t.Fatalf("failed to create MapDirectoryStore: %v", err)

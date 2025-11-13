@@ -21,7 +21,7 @@ func TestMapFileStore(t *testing.T) {
 	tests := []struct {
 		name              string
 		initialData       map[string]any
-		keyEncDecs        map[string]encdec.EncoderDecoder
+		keyEncDecs        map[string]mapstore.IOEncoderDecoder
 		operations        []operation
 		expectedFinalData map[string]any
 	}{
@@ -32,7 +32,7 @@ func TestMapFileStore(t *testing.T) {
 				"bar":    "world",
 				"parent": map[string]any{"child": "secret"},
 			},
-			keyEncDecs: map[string]encdec.EncoderDecoder{
+			keyEncDecs: map[string]mapstore.IOEncoderDecoder{
 				// Example: "foo" => reverseStringEncoderDecoder{}, etc.
 				"foo":          reverseStringEncoderDecoder{},
 				"parent.child": reverseStringEncoderDecoder{},
@@ -63,8 +63,9 @@ func TestMapFileStore(t *testing.T) {
 			store, err := mapstore.NewMapFileStore(
 				filename,
 				tt.initialData,
+				encdec.JSONEncoderDecoder{},
 				mapstore.WithCreateIfNotExists(true),
-				mapstore.WithValueEncDecGetter(func(pathSoFar []string) encdec.EncoderDecoder {
+				mapstore.WithValueEncDecGetter(func(pathSoFar []string) mapstore.IOEncoderDecoder {
 					joined := strings.Join(pathSoFar, ".")
 					if ed, ok := tt.keyEncDecs[joined]; ok {
 						return ed
@@ -151,8 +152,9 @@ func TestMapFileStore(t *testing.T) {
 			newStore, err := mapstore.NewMapFileStore(
 				filename,
 				tt.initialData,
+				encdec.JSONEncoderDecoder{},
 				mapstore.WithCreateIfNotExists(false),
-				mapstore.WithValueEncDecGetter(func(pathSoFar []string) encdec.EncoderDecoder {
+				mapstore.WithValueEncDecGetter(func(pathSoFar []string) mapstore.IOEncoderDecoder {
 					joined := strings.Join(pathSoFar, ".")
 					if ed, ok := tt.keyEncDecs[joined]; ok {
 						return ed
@@ -283,8 +285,9 @@ func Example_events_basicFlow() {
 		file,
 		// No default data.
 		nil,
+		encdec.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
-		mapstore.WithListeners(rec),
+		mapstore.WithFileListeners(rec),
 	)
 
 	_ = store.SetAll(map[string]any{"a": 1})
@@ -328,23 +331,24 @@ func Example_events_autoFlush() {
 	st, _ := mapstore.NewMapFileStore(
 		file,
 		nil,
+		encdec.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
-		mapstore.WithAutoFlush(false),
-		mapstore.WithListeners(listener),
+		mapstore.WithFileAutoFlush(false),
+		mapstore.WithFileListeners(listener),
 	)
 
 	_ = st.SetKey([]string{"unsaved"}, 123)
 	fmt.Println("event op:", last.Op)
 
 	// Re-open the file - the key is not there yet.
-	reopen1, _ := mapstore.NewMapFileStore(file, nil)
+	reopen1, _ := mapstore.NewMapFileStore(file, nil, encdec.JSONEncoderDecoder{})
 	if _, err := reopen1.GetKey([]string{"unsaved"}); err != nil {
 		fmt.Println("not on disk yet")
 	}
 
 	// Flush and try again.
 	_ = st.Flush()
-	reopen2, _ := mapstore.NewMapFileStore(file, nil)
+	reopen2, _ := mapstore.NewMapFileStore(file, nil, encdec.JSONEncoderDecoder{})
 	v, _ := reopen2.GetKey([]string{"unsaved"})
 	fmt.Println("on disk after flush:", v)
 
@@ -368,8 +372,9 @@ func Example_events_panicIsolation() {
 	st, _ := mapstore.NewMapFileStore(
 		file,
 		nil,
+		encdec.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
-		mapstore.WithListeners(bad, good),
+		mapstore.WithFileListeners(bad, good),
 	)
 
 	_ = st.SetKey([]string{"x"}, 1)

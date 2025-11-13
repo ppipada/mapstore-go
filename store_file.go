@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"maps"
 	"os"
@@ -14,11 +15,63 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ppipada/mapstore-go/encdec"
 	"github.com/ppipada/mapstore-go/internal/maputil"
 )
 
 const maxSetAllRetries = 3
+
+// ErrFileConflict is when flush/delete detects that somebody modified the file since we last read/wrote it.
+var ErrFileConflict = errors.New("concurrent modification detected for a file")
+
+// IOEncoderDecoder is an interface that defines methods for encoding and decoding data.
+type IOEncoderDecoder interface {
+	Encode(w io.Writer, value any) error
+	Decode(r io.Reader, value any) error
+}
+
+// StringEncoderDecoder is an interface that defines methods for encoding and decoding a string to another string.
+type StringEncoderDecoder interface {
+	Encode(plain string) string
+	Decode(encoded string) (string, error)
+}
+
+// FileKeyEncDecGetter: given the path so far, if applicable, returns a StringEncoderDecoder
+// It encodes decodes: The key at the path i.e last part of the path array.
+type FileKeyEncDecGetter func(pathSoFar []string) StringEncoderDecoder
+
+// FileValueEncDecGetter: given the path so far, if applicable, returns a EncoderDecoder.
+// It encodes decodes: Value at the key i.e value at last part of the path array.
+type FileValueEncDecGetter func(pathSoFar []string) IOEncoderDecoder
+
+// Operation is the kind of mutation that happened on a file or a key.
+type Operation string
+
+const (
+	OpSetFile    Operation = "setFile"
+	OpResetFile  Operation = "resetFile"
+	OpDeleteFile Operation = "deleteFile"
+	OpSetKey     Operation = "setKey"
+	OpDeleteKey  Operation = "deleteKey"
+)
+
+// FileEvent is delivered *after* a mutation has been written to disk.
+type FileEvent struct {
+	Op Operation
+	// Absolute path of the backing JSON file.
+	File string
+	// Nil for file-level ops.
+	Keys []string
+	// Nil for OpSetFile / OpResetFile.
+	OldValue any
+	// Nil for delete.
+	NewValue any
+	// Deep-copy of the entire map after the change.
+	Data      map[string]any
+	Timestamp time.Time
+}
+
+// FileListener is a callback that observes mutations.
+type FileListener func(FileEvent)
 
 // MapFileStore is a file-backed implementation of a thread-safe key-value store.
 type MapFileStore struct {
@@ -28,56 +81,56 @@ type MapFileStore struct {
 	mu          sync.RWMutex
 
 	// Snapshot for optimistic CAS (nil = unknown).
-	lastStat          os.FileInfo
-	encdec            encdec.EncoderDecoder
-	autoFlush         bool
-	createIfNotExists bool
+	lastStat           os.FileInfo
+	fileEncoderDecoder IOEncoderDecoder
+	autoFlush          bool
+	createIfNotExists  bool
 
-	getValueEncDec ValueEncDecGetter
-	getKeyEncDec   KeyEncDecGetter
+	getValueEncDec FileValueEncDecGetter
+	getKeyEncDec   FileKeyEncDecGetter
 	listeners      []FileListener
 }
 
-// MapFileStoreOption defines a function type that applies a configuration option to the MapFileStore.
-type MapFileStoreOption func(*MapFileStore)
+// FileOption defines a function type that applies a configuration option to the MapFileStore.
+type FileOption func(*MapFileStore)
 
-// WithEncoderDecoder sets a custom encoder/decoder for the store.
-func WithEncoderDecoder(encoder encdec.EncoderDecoder) MapFileStoreOption {
+// WithFileEncoderDecoder sets a custom encoder/decoder for the store.
+func WithFileEncoderDecoder(encoder IOEncoderDecoder) FileOption {
 	return func(store *MapFileStore) {
-		store.encdec = encoder
+		store.fileEncoderDecoder = encoder
 	}
 }
 
-// WithAutoFlush sets the AutoFlush option.
-func WithAutoFlush(autoFlush bool) MapFileStoreOption {
+// WithFileAutoFlush sets the AutoFlush option.
+func WithFileAutoFlush(autoFlush bool) FileOption {
 	return func(store *MapFileStore) {
 		store.autoFlush = autoFlush
 	}
 }
 
 // WithValueEncDecGetter registers the user’s value encoding decoding handler callback.
-func WithValueEncDecGetter(valueEncDecGetter ValueEncDecGetter) MapFileStoreOption {
+func WithValueEncDecGetter(valueEncDecGetter FileValueEncDecGetter) FileOption {
 	return func(store *MapFileStore) {
 		store.getValueEncDec = valueEncDecGetter
 	}
 }
 
 // WithKeyEncDecGetter registers the user’s key encoding decoding handler callback.
-func WithKeyEncDecGetter(getter KeyEncDecGetter) MapFileStoreOption {
+func WithKeyEncDecGetter(getter FileKeyEncDecGetter) FileOption {
 	return func(store *MapFileStore) {
 		store.getKeyEncDec = getter
 	}
 }
 
 // WithCreateIfNotExists sets the option to create the file if it does not exist.
-func WithCreateIfNotExists(createIfNotExists bool) MapFileStoreOption {
+func WithCreateIfNotExists(createIfNotExists bool) FileOption {
 	return func(store *MapFileStore) {
 		store.createIfNotExists = createIfNotExists
 	}
 }
 
-// WithListeners registers one or more listeners during store creation.
-func WithListeners(ls ...FileListener) MapFileStoreOption {
+// WithFileListeners registers one or more listeners during store creation.
+func WithFileListeners(ls ...FileListener) FileOption {
 	return func(s *MapFileStore) { s.listeners = append(s.listeners, ls...) }
 }
 
@@ -86,14 +139,18 @@ func WithListeners(ls ...FileListener) MapFileStoreOption {
 func NewMapFileStore(
 	filename string,
 	defaultData map[string]any,
-	opts ...MapFileStoreOption,
+	fileEncoderDecoder IOEncoderDecoder,
+	opts ...FileOption,
 ) (*MapFileStore, error) {
+	if fileEncoderDecoder == nil {
+		return nil, errors.New("invalid file encoder decoder")
+	}
 	store := &MapFileStore{
-		data:        make(map[string]any),
-		defaultData: defaultData,
-		filename:    filepath.Clean(filename),
-		autoFlush:   true,
-		encdec:      encdec.JSONEncoderDecoder{},
+		data:               make(map[string]any),
+		defaultData:        defaultData,
+		filename:           filepath.Clean(filename),
+		autoFlush:          true,
+		fileEncoderDecoder: fileEncoderDecoder,
 	}
 
 	// Apply options.
@@ -166,7 +223,7 @@ func (store *MapFileStore) GetAll(forceFetch bool) (map[string]any, error) {
 }
 
 // SetAll overwrites all data in the store with the provided data.
-// It retries automatically if another writer wins the race and flushUnlocked returns ErrConflict.
+// It retries automatically if another writer wins the race and flushUnlocked returns ErrFileConflict.
 func (store *MapFileStore) SetAll(data map[string]any) error {
 	if data == nil {
 		return errors.New("SetAll: nil data")
@@ -189,18 +246,18 @@ func (store *MapFileStore) SetAll(data map[string]any) error {
 			return nil
 		}
 
-		// Any error that isn't ErrConflict is fatal.
-		if !errors.Is(err, ErrConflict) {
+		// Any error that isn't ErrFileConflict is fatal.
+		if !errors.Is(err, ErrFileConflict) {
 			return err
 		}
 
-		// ErrConflict - reload latest on-disk state so that store.lastStat is refreshed, then retry.
+		// ErrFileConflict - reload latest on-disk state so that store.lastStat is refreshed, then retry.
 		if loadErr := store.load(); loadErr != nil {
 			return fmt.Errorf("SetAll conflict reload failed: %w", loadErr)
 		}
 	}
 
-	return fmt.Errorf("SetAll: %w after %d retries", ErrConflict, maxSetAllRetries)
+	return fmt.Errorf("SetAll: %w after %d retries", ErrFileConflict, maxSetAllRetries)
 }
 
 // GetKey retrieves the value associated with the given key.
@@ -258,7 +315,7 @@ func (store *MapFileStore) DeleteKey(keys []string) error {
 }
 
 // DeleteFile removes the backing file atomically, emits an OpDeleteFile event and clears lastStat.
-// Returns ErrConflict if the file changed since we last observed it.
+// Returns ErrFileConflict if the file changed since we last observed it.
 func (store *MapFileStore) DeleteFile() error {
 	store.mu.Lock()
 	defer store.mu.Unlock()
@@ -266,7 +323,7 @@ func (store *MapFileStore) DeleteFile() error {
 	if store.lastStat != nil {
 		if cur, err := os.Stat(store.filename); err == nil {
 			if !isSameFileInfo(cur, store.lastStat) {
-				return ErrConflict
+				return ErrFileConflict
 			}
 		} else if !os.IsNotExist(err) {
 			return err
@@ -406,7 +463,7 @@ func (store *MapFileStore) load() error {
 
 	// Decode the data from the file.
 	store.data = make(map[string]any)
-	if err := store.encdec.Decode(f, &store.data); err != nil {
+	if err := store.fileEncoderDecoder.Decode(f, &store.data); err != nil {
 		return fmt.Errorf("failed to decode data from file %s: %w", store.filename, err)
 	}
 
@@ -490,7 +547,7 @@ func (store *MapFileStore) flushUnlocked() error {
 		// Optimistic CAS check.
 		if cur, err := os.Stat(store.filename); err == nil {
 			if !isSameFileInfo(cur, store.lastStat) {
-				return ErrConflict
+				return ErrFileConflict
 			}
 			f, permErr := os.OpenFile(store.filename, os.O_WRONLY, 0)
 			if permErr != nil {
@@ -501,7 +558,7 @@ func (store *MapFileStore) flushUnlocked() error {
 			return err
 		} else {
 			// File vanished, treat as conflict.
-			return ErrConflict
+			return ErrFileConflict
 		}
 	}
 
@@ -517,7 +574,7 @@ func (store *MapFileStore) flushUnlocked() error {
 	if err != nil {
 		return fmt.Errorf("failed to open file %s for flush: %w", store.filename, err)
 	}
-	if err := store.encdec.Encode(tmpFile, dataCopy); err != nil {
+	if err := store.fileEncoderDecoder.Encode(tmpFile, dataCopy); err != nil {
 		tmpFile.Close()
 		os.Remove(tmpName)
 		return fmt.Errorf("failed to encode data to file %s: %w", store.filename, err)
@@ -572,13 +629,13 @@ func (s *MapFileStore) fireEvent(e FileEvent) {
 	}
 }
 
-// If "KeyEncDecGetter(pathSoFar)" returns a StringEncoderDecoder, it renames all immediate sub-keys using Encode() or
-// Decode() depending on the mode. Then it recurses into each sub-value with an updated path.
+// If "FileKeyEncDecGetter(pathSoFar)" returns a StringEncoderDecoder, it renames all immediate sub-keys using Encode()
+// or Decode() depending on the mode. Then it recurses into each sub-value with an updated path.
 // Here obj needs to be any as we may get non map objects in recursive traversal, dont do anything.
 func encodeDecodeAllKeysRecursively(
 	currentMap map[string]any,
 	pathSoFar []string,
-	getKeyEncDec KeyEncDecGetter,
+	getKeyEncDec FileKeyEncDecGetter,
 	encodeMode bool,
 ) error {
 	if getKeyEncDec == nil {
@@ -645,7 +702,7 @@ func encodeDecodeAllKeysRecursively(
 func encodeDecodeAllValuesRecursively(
 	obj any,
 	pathSoFar []string,
-	getValueEncDec ValueEncDecGetter,
+	getValueEncDec FileValueEncDecGetter,
 	encodeMode bool,
 ) (any, error) {
 	// If the user has a value-encoder for this path, encode/decode the entire obj here.
