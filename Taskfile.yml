@@ -1,0 +1,50 @@
+# https://taskfile.dev
+
+version: "3"
+
+vars:
+  GREETING: Hello, these are MapDB tasks!
+
+tasks:
+  default:
+    cmds:
+      - echo "{{.GREETING}}"
+    silent: true
+
+  cloc:
+    cmds:
+      - |
+        cloc --vcs=git --ignored=ignored.txt \
+             --force-lang=Mustache,tmpl --force-lang=INI,env --force-lang=INI,dev --force-lang=INI,prod \
+             --exclude_ext=yaml,sum,mod,md5 --not-match-f='LICENSE$|\.gitignore$' \
+             .
+
+  tagstats:
+    cmds:
+      - ./scripts/git_tag_stats.sh
+
+  lint-gopls:
+    cmds:
+      - ./scripts/lint_gopls_check.sh
+
+  lint-godotfix:
+    cmds:
+      - golangci-lint run --fix --enable-only=godot
+
+  lint-gosort:
+    cmds:
+      # This is a override of the original refdir at github.com/ppipada/refdir that needs to be installed locally.
+      - ../refdir/refdir --const-dir=up --var-dir=up --type-dir=up --recvtype-dir=up --func-dir=down ./...
+
+  lint:
+    cmds:
+      - golangci-lint run ./... -v
+
+  test:
+    cmds:
+      - go test ./...
+
+  lt:
+    cmds:
+      - task: lint
+      - task: test
