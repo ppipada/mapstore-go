@@ -1,30 +1,14 @@
-package dirstore
+package dirpartition
 
 import (
 	"fmt"
 	"time"
+
+	"github.com/ppipada/mapdb-go"
 )
 
-// NoPartitionProvider is a default implementation that treats the base directory as a single partition.
-type NoPartitionProvider struct{}
-
-// GetPartitionDir returns an empty string, indicating no partitioning.
-func (p *NoPartitionProvider) GetPartitionDir(_ FileKey) (string, error) {
-	return "", nil
-}
-
-// ListPartitions returns a single partition representing the base directory.
-func (p *NoPartitionProvider) ListPartitions(
-	baseDir string,
-	sortOrder string,
-	pageToken string,
-	pageSize int,
-) (partitions []string, nextPageToken string, err error) {
-	return []string{""}, "", nil
-}
-
 // TimeExtractor is a function that returns the creation time of a file.
-type TimeExtractor func(key FileKey) (time.Time, error)
+type TimeExtractor func(key mapdb.FileKey) (time.Time, error)
 
 // MonthPartitionProvider decides directories yyyyMM from TimeExtractor.
 type MonthPartitionProvider struct {
@@ -32,7 +16,7 @@ type MonthPartitionProvider struct {
 }
 
 // GetPartitionDir implements the PartitionProvider interface.
-func (p *MonthPartitionProvider) GetPartitionDir(key FileKey) (string, error) {
+func (p *MonthPartitionProvider) GetPartitionDir(key mapdb.FileKey) (string, error) {
 	t, err := p.TimeFn(key)
 	if err != nil {
 		return "", fmt.Errorf("could not get time for file: %s err: %w", key.FileName, err)

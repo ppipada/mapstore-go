@@ -1,4 +1,4 @@
-package dirstore
+package mapdb
 
 import (
 	"encoding/base64"
@@ -11,8 +11,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-
-	"github.com/ppipada/mapdb-go/filestore"
 )
 
 // MapDirectoryStore manages multiple MapFileStores within a directory.
@@ -20,32 +18,25 @@ type MapDirectoryStore struct {
 	baseDir           string
 	pageSize          int
 	PartitionProvider PartitionProvider
-	listeners         []filestore.Listener
+	listeners         []FileListener
 
 	// OpenStores caches open MapFileStore instances per file path.
-	openStores map[string]*filestore.MapFileStore
+	openStores map[string]*MapFileStore
 	openMu     sync.Mutex
 }
 
-// Option is a functional option for configuring the MapDirectoryStore.
-type Option func(*MapDirectoryStore)
+// MapDirectoryStoreOption is a functional option for configuring the MapDirectoryStore.
+type MapDirectoryStoreOption func(*MapDirectoryStore)
 
 // WithPageSize sets the default page size for pagination.
-func WithPageSize(size int) Option {
+func WithPageSize(size int) MapDirectoryStoreOption {
 	return func(mds *MapDirectoryStore) {
 		mds.pageSize = size
 	}
 }
 
-// WithPartitionProvider sets a custom partition provider.
-func WithPartitionProvider(provider PartitionProvider) Option {
-	return func(mds *MapDirectoryStore) {
-		mds.PartitionProvider = provider
-	}
-}
-
-// WithListeners registers one or more listeners when the directory store is created.
-func WithListeners(ls ...filestore.Listener) Option {
+// WithFileListeners registers one or more listeners when the directory store is created.
+func WithFileListeners(ls ...FileListener) MapDirectoryStoreOption {
 	return func(mds *MapDirectoryStore) {
 		mds.listeners = append(mds.listeners, ls...)
 	}
@@ -55,7 +46,8 @@ func WithListeners(ls ...filestore.Listener) Option {
 func NewMapDirectoryStore(
 	baseDir string,
 	createIfNotExists bool,
-	opts ...Option,
+	partitionProvider PartitionProvider,
+	opts ...MapDirectoryStoreOption,
 ) (*MapDirectoryStore, error) {
 	// Resolve the base directory path.
 	baseDir, err := filepath.Abs(baseDir)
@@ -77,8 +69,8 @@ func NewMapDirectoryStore(
 	mds := &MapDirectoryStore{
 		baseDir:           baseDir,
 		pageSize:          10,
-		PartitionProvider: &NoPartitionProvider{},
-		openStores:        make(map[string]*filestore.MapFileStore),
+		PartitionProvider: partitionProvider,
+		openStores:        make(map[string]*MapFileStore),
 	}
 
 	for _, opt := range opts {
@@ -135,7 +127,7 @@ func (mds *MapDirectoryStore) Open(
 	fileKey FileKey,
 	createIfNotExists bool,
 	defaultData map[string]any,
-) (*filestore.MapFileStore, error) {
+) (*MapFileStore, error) {
 	filePath, err := mds.validateAndGetFilePath(fileKey)
 	if err != nil {
 		return nil, err
@@ -159,12 +151,12 @@ func (mds *MapDirectoryStore) Open(
 		}
 	}
 
-	// Create a new MapFileStore.
-	store, err = filestore.NewMapFileStore(
+	// Create a new Map
+	store, err = NewMapFileStore(
 		filePath,
 		defaultData,
-		filestore.WithCreateIfNotExists(createIfNotExists),
-		filestore.WithListeners(mds.listeners...),
+		WithCreateIfNotExists(createIfNotExists),
+		WithListeners(mds.listeners...),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file store for %s: %w", fileKey.FileName, err)
@@ -198,11 +190,11 @@ func (mds *MapDirectoryStore) Close(fileKey FileKey) error {
 // CloseAll closes every cached MapFileStore in this directory instance and clears the cache.
 func (mds *MapDirectoryStore) CloseAll() error {
 	mds.openMu.Lock()
-	stores := make([]*filestore.MapFileStore, 0, len(mds.openStores))
+	stores := make([]*MapFileStore, 0, len(mds.openStores))
 	for _, st := range mds.openStores {
 		stores = append(stores, st)
 	}
-	mds.openStores = make(map[string]*filestore.MapFileStore)
+	mds.openStores = make(map[string]*MapFileStore)
 	mds.openMu.Unlock()
 
 	var firstErr error

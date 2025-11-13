@@ -1,4 +1,4 @@
-package filestore
+package integration
 
 import (
 	"encoding/base64"
@@ -12,7 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ppipada/mapdb-go"
 	"github.com/ppipada/mapdb-go/encdec"
+	"github.com/ppipada/mapdb-go/internal/maputil"
 )
 
 func TestMapFileStore(t *testing.T) {
@@ -57,12 +59,12 @@ func TestMapFileStore(t *testing.T) {
 			tempDir := t.TempDir()
 			filename := filepath.Join(tempDir, "simplemapdb_test.json")
 
-			// Create store with initial data, using the new WithValueEncDecGetter.
-			store, err := NewMapFileStore(
+			// Create store with initial data, using the new mapdb.WithValueEncDecGetter.
+			store, err := mapdb.NewMapFileStore(
 				filename,
 				tt.initialData,
-				WithCreateIfNotExists(true),
-				WithValueEncDecGetter(func(pathSoFar []string) encdec.EncoderDecoder {
+				mapdb.WithCreateIfNotExists(true),
+				mapdb.WithValueEncDecGetter(func(pathSoFar []string) encdec.EncoderDecoder {
 					joined := strings.Join(pathSoFar, ".")
 					if ed, ok := tt.keyEncDecs[joined]; ok {
 						return ed
@@ -95,7 +97,7 @@ func TestMapFileStore(t *testing.T) {
 			// Check that the values for the "encoded" keys are properly base64-encoded reversed strings.
 			for key := range tt.keyEncDecs {
 				keys := strings.Split(key, ".")
-				val, err := GetValueAtPath(fileData, keys)
+				val, err := maputil.GetValueAtPath(fileData, keys)
 				if err != nil {
 					t.Errorf("failed to get value at key %s in file data: %v", key, err)
 					continue
@@ -118,7 +120,7 @@ func TestMapFileStore(t *testing.T) {
 				reversedValue := string(decodedBytes)
 
 				// Get the original value from initialData at the same key.
-				originalVal, err := GetValueAtPath(tt.initialData, keys)
+				originalVal, err := maputil.GetValueAtPath(tt.initialData, keys)
 				if err != nil {
 					t.Errorf("failed to get original value at key %s: %v", key, err)
 					continue
@@ -146,11 +148,11 @@ func TestMapFileStore(t *testing.T) {
 			}
 
 			// Now, create a new store from the file (using the same approach).
-			newStore, err := NewMapFileStore(
+			newStore, err := mapdb.NewMapFileStore(
 				filename,
 				tt.initialData,
-				WithCreateIfNotExists(false),
-				WithValueEncDecGetter(func(pathSoFar []string) encdec.EncoderDecoder {
+				mapdb.WithCreateIfNotExists(false),
+				mapdb.WithValueEncDecGetter(func(pathSoFar []string) encdec.EncoderDecoder {
 					joined := strings.Join(pathSoFar, ".")
 					if ed, ok := tt.keyEncDecs[joined]; ok {
 						return ed
@@ -198,7 +200,7 @@ func TestMapFileStore(t *testing.T) {
 			// Check that the values for the "encoded" keys remain properly encoded.
 			for key := range tt.keyEncDecs {
 				keys := strings.Split(key, ".")
-				val, err := GetValueAtPath(fileDataAfterOps, keys)
+				val, err := maputil.GetValueAtPath(fileDataAfterOps, keys)
 				if err != nil {
 					t.Errorf(
 						"failed to get value at key %s in file data after operations: %v",
@@ -231,7 +233,7 @@ func TestMapFileStore(t *testing.T) {
 				reversedValue := string(decodedBytes)
 
 				// Compare to finalData’s in-memory value.
-				finalVal, err := GetValueAtPath(tt.expectedFinalData, keys)
+				finalVal, err := maputil.GetValueAtPath(tt.expectedFinalData, keys)
 				if err != nil {
 					t.Errorf("failed to get final value at key %s: %v", key, err)
 					continue
@@ -266,8 +268,8 @@ func Example_events_basicFlow() {
 
 	// Record every event we receive.
 	var mu sync.Mutex
-	var got []Event
-	rec := func(e Event) {
+	var got []mapdb.FileEvent
+	rec := func(e mapdb.FileEvent) {
 		mu.Lock()
 		defer mu.Unlock()
 
@@ -277,12 +279,12 @@ func Example_events_basicFlow() {
 		got = append(got, e)
 	}
 
-	store, _ := NewMapFileStore(
+	store, _ := mapdb.NewMapFileStore(
 		file,
 		// No default data.
 		nil,
-		WithCreateIfNotExists(true),
-		WithListeners(rec),
+		mapdb.WithCreateIfNotExists(true),
+		mapdb.WithListeners(rec),
 	)
 
 	_ = store.SetAll(map[string]any{"a": 1})
@@ -294,11 +296,11 @@ func Example_events_basicFlow() {
 	mu.Lock()
 	for _, ev := range got {
 		switch ev.Op {
-		case OpSetFile:
+		case mapdb.OpSetFile:
 			fmt.Printf("%s -> %v\n", ev.Op, ev.Data)
-		case OpResetFile:
+		case mapdb.OpResetFile:
 			fmt.Printf("%s\n", ev.Op)
-		case OpDeleteFile, OpSetKey, OpDeleteKey:
+		case mapdb.OpDeleteFile, mapdb.OpSetKey, mapdb.OpDeleteKey:
 			fmt.Printf("%s %v  old=%v  new=%v\n",
 				ev.Op, ev.Keys, ev.OldValue, ev.NewValue)
 		}
@@ -320,29 +322,29 @@ func Example_events_autoFlush() {
 	defer os.RemoveAll(tmp)
 	file := filepath.Join(tmp, "store.json")
 
-	var last Event
-	listener := func(e Event) { last = e }
+	var last mapdb.FileEvent
+	listener := func(e mapdb.FileEvent) { last = e }
 
-	st, _ := NewMapFileStore(
+	st, _ := mapdb.NewMapFileStore(
 		file,
 		nil,
-		WithCreateIfNotExists(true),
-		WithAutoFlush(false),
-		WithListeners(listener),
+		mapdb.WithCreateIfNotExists(true),
+		mapdb.WithAutoFlush(false),
+		mapdb.WithListeners(listener),
 	)
 
 	_ = st.SetKey([]string{"unsaved"}, 123)
 	fmt.Println("event op:", last.Op)
 
 	// Re-open the file - the key is not there yet.
-	reopen1, _ := NewMapFileStore(file, nil)
+	reopen1, _ := mapdb.NewMapFileStore(file, nil)
 	if _, err := reopen1.GetKey([]string{"unsaved"}); err != nil {
 		fmt.Println("not on disk yet")
 	}
 
 	// Flush and try again.
 	_ = st.Flush()
-	reopen2, _ := NewMapFileStore(file, nil)
+	reopen2, _ := mapdb.NewMapFileStore(file, nil)
 	v, _ := reopen2.GetKey([]string{"unsaved"})
 	fmt.Println("on disk after flush:", v)
 
@@ -359,15 +361,15 @@ func Example_events_panicIsolation() {
 	defer os.RemoveAll(tmp)
 	file := filepath.Join(tmp, "store.json")
 
-	bad := func(Event) { panic("boom") }
+	bad := func(mapdb.FileEvent) { panic("boom") }
 	var goodCalled bool
-	good := func(Event) { goodCalled = true }
+	good := func(mapdb.FileEvent) { goodCalled = true }
 
-	st, _ := NewMapFileStore(
+	st, _ := mapdb.NewMapFileStore(
 		file,
 		nil,
-		WithCreateIfNotExists(true),
-		WithListeners(bad, good),
+		mapdb.WithCreateIfNotExists(true),
+		mapdb.WithListeners(bad, good),
 	)
 
 	_ = st.SetKey([]string{"x"}, 1)

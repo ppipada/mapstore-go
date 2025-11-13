@@ -1,4 +1,4 @@
-package filestore
+package mapdb
 
 import (
 	"bytes"
@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ppipada/mapdb-go/encdec"
+	"github.com/ppipada/mapdb-go/internal/maputil"
 )
 
 const maxSetAllRetries = 3
@@ -34,49 +35,49 @@ type MapFileStore struct {
 
 	getValueEncDec ValueEncDecGetter
 	getKeyEncDec   KeyEncDecGetter
-	listeners      []Listener
+	listeners      []FileListener
 }
 
-// Option defines a function type that applies a configuration option to the MapFileStore.
-type Option func(*MapFileStore)
+// MapFileStoreOption defines a function type that applies a configuration option to the MapFileStore.
+type MapFileStoreOption func(*MapFileStore)
 
 // WithEncoderDecoder sets a custom encoder/decoder for the store.
-func WithEncoderDecoder(encoder encdec.EncoderDecoder) Option {
+func WithEncoderDecoder(encoder encdec.EncoderDecoder) MapFileStoreOption {
 	return func(store *MapFileStore) {
 		store.encdec = encoder
 	}
 }
 
 // WithAutoFlush sets the AutoFlush option.
-func WithAutoFlush(autoFlush bool) Option {
+func WithAutoFlush(autoFlush bool) MapFileStoreOption {
 	return func(store *MapFileStore) {
 		store.autoFlush = autoFlush
 	}
 }
 
 // WithValueEncDecGetter registers the user’s value encoding decoding handler callback.
-func WithValueEncDecGetter(valueEncDecGetter ValueEncDecGetter) Option {
+func WithValueEncDecGetter(valueEncDecGetter ValueEncDecGetter) MapFileStoreOption {
 	return func(store *MapFileStore) {
 		store.getValueEncDec = valueEncDecGetter
 	}
 }
 
 // WithKeyEncDecGetter registers the user’s key encoding decoding handler callback.
-func WithKeyEncDecGetter(getter KeyEncDecGetter) Option {
+func WithKeyEncDecGetter(getter KeyEncDecGetter) MapFileStoreOption {
 	return func(store *MapFileStore) {
 		store.getKeyEncDec = getter
 	}
 }
 
 // WithCreateIfNotExists sets the option to create the file if it does not exist.
-func WithCreateIfNotExists(createIfNotExists bool) Option {
+func WithCreateIfNotExists(createIfNotExists bool) MapFileStoreOption {
 	return func(store *MapFileStore) {
 		store.createIfNotExists = createIfNotExists
 	}
 }
 
 // WithListeners registers one or more listeners during store creation.
-func WithListeners(ls ...Listener) Option {
+func WithListeners(ls ...FileListener) MapFileStoreOption {
 	return func(s *MapFileStore) { s.listeners = append(s.listeners, ls...) }
 }
 
@@ -85,7 +86,7 @@ func WithListeners(ls ...Listener) Option {
 func NewMapFileStore(
 	filename string,
 	defaultData map[string]any,
-	opts ...Option,
+	opts ...MapFileStoreOption,
 ) (*MapFileStore, error) {
 	store := &MapFileStore{
 		data:        make(map[string]any),
@@ -132,7 +133,7 @@ func (store *MapFileStore) Reset() error {
 	if err != nil {
 		return err
 	}
-	store.fireEvent(Event{
+	store.fireEvent(FileEvent{
 		Op:        OpResetFile,
 		File:      store.filename,
 		Data:      copyAfter,
@@ -179,7 +180,7 @@ func (store *MapFileStore) SetAll(data map[string]any) error {
 	for range maxSetAllRetries {
 		copyAfter, err = store.setAll(data)
 		if err == nil {
-			store.fireEvent(Event{
+			store.fireEvent(FileEvent{
 				Op:        OpSetFile,
 				File:      store.filename,
 				Data:      copyAfter,
@@ -211,11 +212,11 @@ func (store *MapFileStore) GetKey(keys []string) (any, error) {
 	store.mu.RLock()
 	defer store.mu.RUnlock()
 
-	val, err := GetValueAtPath(store.data, keys)
+	val, err := maputil.GetValueAtPath(store.data, keys)
 	if err != nil {
 		return nil, err
 	}
-	return DeepCopyValue(val), nil
+	return maputil.DeepCopyValue(val), nil
 }
 
 // SetKey sets the value for the given key.
@@ -225,12 +226,12 @@ func (store *MapFileStore) SetKey(keys []string, value any) error {
 	if err != nil {
 		return err
 	}
-	store.fireEvent(Event{
+	store.fireEvent(FileEvent{
 		Op:        OpSetKey,
 		File:      store.filename,
 		Keys:      slices.Clone(keys),
-		OldValue:  DeepCopyValue(oldVal),
-		NewValue:  DeepCopyValue(value),
+		OldValue:  maputil.DeepCopyValue(oldVal),
+		NewValue:  maputil.DeepCopyValue(value),
 		Data:      copyAfter,
 		Timestamp: time.Now(),
 	})
@@ -244,11 +245,11 @@ func (store *MapFileStore) DeleteKey(keys []string) error {
 	if err != nil {
 		return err
 	}
-	store.fireEvent(Event{
+	store.fireEvent(FileEvent{
 		Op:        OpDeleteKey,
 		File:      store.filename,
 		Keys:      slices.Clone(keys),
-		OldValue:  DeepCopyValue(oldVal),
+		OldValue:  maputil.DeepCopyValue(oldVal),
 		NewValue:  nil,
 		Data:      copyAfter,
 		Timestamp: time.Now(),
@@ -279,7 +280,7 @@ func (store *MapFileStore) DeleteFile() error {
 	store.lastStat = nil
 	store.data = make(map[string]any)
 
-	store.fireEvent(Event{
+	store.fireEvent(FileEvent{
 		Op:        OpDeleteFile,
 		File:      store.filename,
 		Timestamp: time.Now(),
@@ -302,7 +303,7 @@ func (store *MapFileStore) setAll(data map[string]any) (copyAfter map[string]any
 	// Deep copy the input data to prevent external modifications after setting.
 	store.data = make(map[string]any)
 	maps.Copy(store.data, data)
-	copyAfter, _ = DeepCopyValue(store.data).(map[string]any)
+	copyAfter, _ = maputil.DeepCopyValue(store.data).(map[string]any)
 
 	if store.autoFlush {
 		if err = store.flushUnlocked(); err != nil {
@@ -318,7 +319,7 @@ func (store *MapFileStore) reset() (copyAfter map[string]any, err error) {
 
 	store.data = make(map[string]any)
 	maps.Copy(store.data, store.defaultData)
-	copyAfter, _ = DeepCopyValue(store.data).(map[string]any)
+	copyAfter, _ = maputil.DeepCopyValue(store.data).(map[string]any)
 
 	if err = store.flushUnlocked(); err != nil {
 		return nil, fmt.Errorf("failed to save data after Reset: %w", err)
@@ -336,11 +337,11 @@ func (store *MapFileStore) setKey(
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	oldVal, _ = GetValueAtPath(store.data, keys)
-	if err := SetValueAtPath(store.data, keys, value); err != nil {
+	oldVal, _ = maputil.GetValueAtPath(store.data, keys)
+	if err := maputil.SetValueAtPath(store.data, keys, value); err != nil {
 		return nil, nil, fmt.Errorf("failed to set value at key %v: %w", keys, err)
 	}
-	copyAfter, _ = DeepCopyValue(store.data).(map[string]any)
+	copyAfter, _ = maputil.DeepCopyValue(store.data).(map[string]any)
 	if store.autoFlush {
 		if err := store.flushUnlocked(); err != nil {
 			return nil, nil, fmt.Errorf(
@@ -441,12 +442,12 @@ func (store *MapFileStore) deleteKey(
 	store.mu.Lock()
 	defer store.mu.Unlock()
 
-	oldVal, _ = GetValueAtPath(store.data, keys)
+	oldVal, _ = maputil.GetValueAtPath(store.data, keys)
 
-	if err := DeleteValueAtPath(store.data, keys); err != nil {
+	if err := maputil.DeleteValueAtPath(store.data, keys); err != nil {
 		return nil, nil, fmt.Errorf("failed to delete key %v: %w", keys, err)
 	}
-	copyAfter, _ = DeepCopyValue(store.data).(map[string]any)
+	copyAfter, _ = maputil.DeepCopyValue(store.data).(map[string]any)
 
 	if store.autoFlush {
 		if err := store.flushUnlocked(); err != nil {
@@ -464,7 +465,7 @@ func (store *MapFileStore) flushUnlocked() error {
 	// We'll make a deep copy so we don't mutate in-memory.
 	// No error as store.data is always a map.
 	encodeMode := true
-	dataCopy, _ := DeepCopyValue(store.data).(map[string]any)
+	dataCopy, _ := maputil.DeepCopyValue(store.data).(map[string]any)
 
 	// First encode values so that all keys from in mem are non mutated.
 	// Encode KEYS next, so that on disk, the providers/modelnames become base64, etc.
@@ -546,12 +547,12 @@ func (s *MapFileStore) rememberStat() error {
 
 // fireEvent delivers e to all listeners, recovering from panics so that a faulty
 // observer cannot crash the store.
-func (s *MapFileStore) fireEvent(e Event) {
+func (s *MapFileStore) fireEvent(e FileEvent) {
 	for _, l := range s.listeners {
 		if l == nil {
 			continue
 		}
-		func(cb Listener) {
+		func(cb FileListener) {
 			defer func() {
 				if r := recover(); r != nil {
 					// Log.Printf("filestore: listener panic: %v", r).
