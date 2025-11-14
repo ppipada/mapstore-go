@@ -37,8 +37,8 @@ tasks:
 
   lint-gosort:
     cmds:
-      # This is a override of the original refdir at github.com/ppipada/refdir that needs to be installed locally.
-      - ../refdir/refdir --const-dir=up --var-dir=up --type-dir=up --recvtype-dir=up --func-dir=down ./...
+      # Use the override of the original refdir at github.com/ppipada/refdir. Do a go get before.
+      - refdir ./...
 
   lint:
     cmds:
