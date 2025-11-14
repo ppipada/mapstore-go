@@ -11,6 +11,7 @@ import (
 
 	"github.com/ppipada/mapstore-go"
 	"github.com/ppipada/mapstore-go/encdec"
+	"github.com/ppipada/mapstore-go/internal/encdecutil"
 )
 
 func TestNewMapFileStore(t *testing.T) {
@@ -664,7 +665,7 @@ func TestMapFileStore_KeyEncodingDecoding(t *testing.T) {
 	// i.e. it encodes/decodes every key in the store.
 	keyEncDecGetter := func(pathSoFar []string) mapstore.StringEncoderDecoder {
 		// Always return the base64 encoder/decoder.
-		return encdec.Base64StringEncoderDecoder{}
+		return encdecutil.Base64StringEncoderDecoder{}
 	}
 
 	// Create store with default data and our KeyEncDec.
@@ -814,7 +815,7 @@ func TestMapFileStore_SetAll_KeyEncDec(t *testing.T) {
 	filename := filepath.Join(tempDir, "teststore_setall_keyencdec.json")
 
 	keyEncDecGetter := func(pathSoFar []string) mapstore.StringEncoderDecoder {
-		return encdec.Base64StringEncoderDecoder{}
+		return encdecutil.Base64StringEncoderDecoder{}
 	}
 	defaultData := map[string]any{"default": "val"}
 
