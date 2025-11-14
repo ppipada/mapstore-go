@@ -32,6 +32,20 @@ type PartitionProvider interface {
 		pageSize int) (partitions []string, nextPageToken string, err error)
 }
 
+// ListingConfig holds all options for listing files.
+type ListingConfig struct {
+	SortOrder        string
+	PageSize         int
+	FilterPartitions []string // If empty, list all partitions.
+	FilenamePrefix   string   // If non-empty, only return files with this prefix.
+}
+
+type FileEntry struct {
+	BaseRelativePath string
+	PartitionName    string
+	FileInfo         os.FileInfo
+}
+
 // MapDirectoryStore manages multiple MapFileStores within a directory.
 type MapDirectoryStore struct {
 	baseDir            string
@@ -242,34 +256,20 @@ func (mds *MapDirectoryStore) ListPartitions(
 	return mds.partitionProvider.ListPartitions(baseDir, sortOrder, pageToken, pageSize)
 }
 
-// ListingConfig holds all options for listing files.
-type ListingConfig struct {
-	SortOrder        string
-	PageSize         int
-	FilterPartitions []string // If empty, list all partitions.
-	FilenamePrefix   string   // If non-empty, only return files with this prefix.
-}
-
-// PartitionFilterPageToken tracks progress through filtered partitions.
-type PartitionFilterPageToken struct {
+// partitionFilterPageToken tracks progress through filtered partitions.
+type partitionFilterPageToken struct {
 	PartitionIndex   int      `json:"partitionIndex"`
 	FilterPartitions []string `json:"filterPartitions"`
 }
 
-// PageTokenData encodes all paging state.
-type PageTokenData struct {
+// pageTokenData encodes all paging state.
+type pageTokenData struct {
 	FileIndex                 int                       `json:"fileIndex"`
 	SortOrder                 string                    `json:"sortOrder"`
 	PageSize                  int                       `json:"pageSize"`
 	FilenamePrefix            string                    `json:"filenamePrefix,omitempty"`
 	PartitionListingPageToken string                    `json:"partitionListingPageToken,omitempty"`
-	PartitionFilterPageToken  *PartitionFilterPageToken `json:"partitionFilterPageToken,omitempty"`
-}
-
-type FileEntry struct {
-	BaseRelativePath string
-	PartitionName    string
-	FileInfo         os.FileInfo
+	PartitionFilterPageToken  *partitionFilterPageToken `json:"partitionFilterPageToken,omitempty"`
 }
 
 // ListFiles lists files according to the config and page token.
@@ -277,7 +277,7 @@ func (mds *MapDirectoryStore) ListFiles(
 	config ListingConfig,
 	pageToken string,
 ) (fileEntries []FileEntry, nextPageToken string, err error) {
-	var token PageTokenData
+	var token pageTokenData
 
 	// Decode page token or initialize.
 	if pageToken != "" {
@@ -300,7 +300,7 @@ func (mds *MapDirectoryStore) ListFiles(
 		}
 		token.FilenamePrefix = config.FilenamePrefix
 		if len(config.FilterPartitions) > 0 {
-			token.PartitionFilterPageToken = &PartitionFilterPageToken{
+			token.PartitionFilterPageToken = &partitionFilterPageToken{
 				PartitionIndex:   0,
 				FilterPartitions: config.FilterPartitions,
 			}
@@ -361,7 +361,7 @@ func (mds *MapDirectoryStore) ListFiles(
 			)
 			if len(fileEntries) > token.PageSize {
 				// Prepare next page token.
-				nextToken := PageTokenData{
+				nextToken := pageTokenData{
 					SortOrder:      token.SortOrder,
 					FileIndex:      j,
 					PageSize:       token.PageSize,
@@ -369,7 +369,7 @@ func (mds *MapDirectoryStore) ListFiles(
 				}
 				if isFiltered {
 					pfpt := *token.PartitionFilterPageToken
-					nextToken.PartitionFilterPageToken = &PartitionFilterPageToken{
+					nextToken.PartitionFilterPageToken = &partitionFilterPageToken{
 						PartitionIndex:   pfpt.PartitionIndex,
 						FilterPartitions: pfpt.FilterPartitions,
 					}
