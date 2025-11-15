@@ -12,6 +12,25 @@ import (
 
 var nonAlphaNum = regexp.MustCompile(`[^a-zA-Z0-9]`)
 
+// FileInfo is the logical information that can be extracted from a file name.
+type FileInfo struct {
+	ID        string
+	Title     string
+	CreatedAt time.Time
+}
+
+// Provider converts between logical information and a physical file name.
+type Provider interface {
+	// Build turns the logical conversation data into a file name.
+	Build(info FileInfo) (string, error)
+
+	// Parse does the inverse and must work with the file names returned by Build.
+	Parse(filename string) (*FileInfo, error)
+
+	// CreatedAt is a convenience wrapper, it may call Parse under the hood.
+	CreatedAt(filename string) (time.Time, error)
+}
+
 type UUIDv7Provider struct{}
 
 // Build "<uuid>_<sanitised-title>.json".
@@ -67,6 +86,7 @@ func (p *UUIDv7Provider) Parse(filename string) (*FileInfo, error) {
 	}, nil
 }
 
+// ExtractTimeFromUUIDv7 returns a time object from uuid7 string.
 func ExtractTimeFromUUIDv7(uuidStr string) (time.Time, error) {
 	if len(uuidStr) != 36 {
 		return time.Time{}, fmt.Errorf("invalid UUIDv7: %s", uuidStr)

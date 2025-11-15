@@ -24,8 +24,6 @@ const (
 	tokenizerOptions = "porter unicode61 remove_diacritics 1"
 )
 
-var ErrEmptyQuery = errors.New("empty query")
-
 type Engine struct {
 	db  *sql.DB
 	cfg Config
@@ -398,7 +396,7 @@ func (e *Engine) Search(
 	pageSize int,
 ) (hits []SearchResult, nextToken string, err error) {
 	if query == "" {
-		return nil, "", ErrEmptyQuery
+		return nil, "", errors.New("empty query")
 	}
 
 	if pageSize <= 0 || pageSize > 10000 {
