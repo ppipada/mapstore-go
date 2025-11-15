@@ -1,4 +1,4 @@
-package encdec
+package encdeckeyring
 
 import (
 	"bytes"

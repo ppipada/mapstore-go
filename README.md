@@ -18,9 +18,12 @@ MapStore is a local, filesystem‑backed map database with pluggable codecs (JSO
 
 ## Extensibility Highlights
 
-- **Custom encoders** - supply your own `encdec.EncoderDecoder` via `filestore.WithFileEncoderDecoder`, or override specific keys with `WithValueEncDecGetter`.
-- **Per-key encryption** - use `encdec.EncryptedStringValueEncoderDecoder` to transparently store sensitive strings through the OS keyring.
-- **Partitioning** - swap in your own `dirstore.PartitionProvider` to control directory layout.
+- **File encoders** - supply your own `IOEncoderDecoder` via `WithFileEncoderDecoder`.
+  - _JSON file encode/decode_ - use the inbuilt `encdecjson.JSONEncoderDecoder` to encode/decode files as JSON.
+- **Encode key or value at sub-path** - override encoding of specific keys or values with `WithKeyEncDecGetter` or `WithValueEncDecGetter`.
+  - _Value encryption_ - use the inbuilt `encdeckeyring.EncryptedStringValueEncoderDecoder` to transparently store sensitive string values through the OS keyring.
+- **Partitioning** - swap in your own `PartitionProvider` to control directory layout.
+  - _Month based partitioning_ - use the inbuilt `dirpartition.MonthPartitionProvider` to split files across month based directories.
 - **File naming** - implement `filenameprovider.Provider` or use the provided UUIDv7-based default to keep file names collision-free.
 - **Full text sync** - plug custom iterators into `ftsengine.SyncIterToFTS` for efficient, incremental index updates.
 

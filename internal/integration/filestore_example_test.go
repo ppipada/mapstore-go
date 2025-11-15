@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/ppipada/mapstore-go"
-	"github.com/ppipada/mapstore-go/encdec"
+	"github.com/ppipada/mapstore-go/encdecjson"
 	"github.com/ppipada/mapstore-go/internal/maputil"
 )
 
@@ -63,7 +63,7 @@ func TestMapFileStore(t *testing.T) {
 			store, err := mapstore.NewMapFileStore(
 				filename,
 				tt.initialData,
-				encdec.JSONEncoderDecoder{},
+				encdecjson.JSONEncoderDecoder{},
 				mapstore.WithCreateIfNotExists(true),
 				mapstore.WithValueEncDecGetter(func(pathSoFar []string) mapstore.IOEncoderDecoder {
 					joined := strings.Join(pathSoFar, ".")
@@ -152,7 +152,7 @@ func TestMapFileStore(t *testing.T) {
 			newStore, err := mapstore.NewMapFileStore(
 				filename,
 				tt.initialData,
-				encdec.JSONEncoderDecoder{},
+				encdecjson.JSONEncoderDecoder{},
 				mapstore.WithCreateIfNotExists(false),
 				mapstore.WithValueEncDecGetter(func(pathSoFar []string) mapstore.IOEncoderDecoder {
 					joined := strings.Join(pathSoFar, ".")
@@ -285,7 +285,7 @@ func Example_events_basicFlow() {
 		file,
 		// No default data.
 		nil,
-		encdec.JSONEncoderDecoder{},
+		encdecjson.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
 		mapstore.WithFileListeners(rec),
 	)
@@ -331,7 +331,7 @@ func Example_events_autoFlush() {
 	st, _ := mapstore.NewMapFileStore(
 		file,
 		nil,
-		encdec.JSONEncoderDecoder{},
+		encdecjson.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
 		mapstore.WithFileAutoFlush(false),
 		mapstore.WithFileListeners(listener),
@@ -341,14 +341,14 @@ func Example_events_autoFlush() {
 	fmt.Println("event op:", last.Op)
 
 	// Re-open the file - the key is not there yet.
-	reopen1, _ := mapstore.NewMapFileStore(file, nil, encdec.JSONEncoderDecoder{})
+	reopen1, _ := mapstore.NewMapFileStore(file, nil, encdecjson.JSONEncoderDecoder{})
 	if _, err := reopen1.GetKey([]string{"unsaved"}); err != nil {
 		fmt.Println("not on disk yet")
 	}
 
 	// Flush and try again.
 	_ = st.Flush()
-	reopen2, _ := mapstore.NewMapFileStore(file, nil, encdec.JSONEncoderDecoder{})
+	reopen2, _ := mapstore.NewMapFileStore(file, nil, encdecjson.JSONEncoderDecoder{})
 	v, _ := reopen2.GetKey([]string{"unsaved"})
 	fmt.Println("on disk after flush:", v)
 
@@ -372,7 +372,7 @@ func Example_events_panicIsolation() {
 	st, _ := mapstore.NewMapFileStore(
 		file,
 		nil,
-		encdec.JSONEncoderDecoder{},
+		encdecjson.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
 		mapstore.WithFileListeners(bad, good),
 	)
