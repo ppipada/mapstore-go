@@ -32,10 +32,12 @@ func TestEncodeDecode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			encoderDecoder := EncryptedStringValueEncoderDecoder{}
-
+			encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("keyringencdec", "user")
+			if err != nil {
+				t.Fatalf("getEncoderDecoder failed: %v", err)
+			}
 			buffer := &bytes.Buffer{}
-			err := encoderDecoder.Encode(buffer, tc.input)
+			err = encoderDecoder.Encode(buffer, tc.input)
 			if err != nil {
 				t.Fatalf("Encode failed: %v", err)
 			}
@@ -68,8 +70,10 @@ func TestEncodeDecode(t *testing.T) {
 }
 
 func TestDecodeInvalidData(t *testing.T) {
-	encoderDecoder := EncryptedStringValueEncoderDecoder{}
-
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("keyringencdec", "user")
+	if err != nil {
+		t.Fatalf("getEncoderDecoder failed: %v", err)
+	}
 	testCases := []struct {
 		desc         string
 		invalidInput string
@@ -103,10 +107,12 @@ func (e *errorWriter) Write(p []byte) (n int, err error) {
 }
 
 func TestEncodeWithErrorWriter(t *testing.T) {
-	encoderDecoder := EncryptedStringValueEncoderDecoder{}
-
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("keyringencdec", "user")
+	if err != nil {
+		t.Fatalf("getEncoderDecoder failed: %v", err)
+	}
 	w := &errorWriter{}
-	err := encoderDecoder.Encode(w, "some data")
+	err = encoderDecoder.Encode(w, "some data")
 	if err == nil {
 		t.Errorf("Expected error when encoding with erroring writer, but got none")
 	}
