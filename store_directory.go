@@ -18,7 +18,7 @@ const (
 	SortOrderDescending = "desc"
 )
 
-var ErrCannotReadPartitionDir = errors.New("failed to read partition directory")
+var errCannotReadPartitionDir = errors.New("failed to read partition directory")
 
 type FileKey struct {
 	FileName string
@@ -343,7 +343,7 @@ func (mds *MapDirectoryStore) ListFiles(
 			token.SortOrder,
 			token.FilenamePrefix,
 		)
-		if err != nil && errors.Is(err, ErrCannotReadPartitionDir) {
+		if err != nil && errors.Is(err, errCannotReadPartitionDir) {
 			slog.Debug("skipping listing partition", "error", err)
 			token.PartitionFilterPageToken.PartitionIndex++
 		} else if err != nil {
@@ -402,7 +402,7 @@ func (mds *MapDirectoryStore) readPartitionFiles(
 ) ([]os.FileInfo, error) {
 	files, err := os.ReadDir(partitionPath)
 	if err != nil {
-		return nil, fmt.Errorf("partition %s: %w", partitionPath, ErrCannotReadPartitionDir)
+		return nil, fmt.Errorf("partition %s: %w", partitionPath, errCannotReadPartitionDir)
 	}
 
 	var fileInfos []os.FileInfo
