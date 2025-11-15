@@ -11,6 +11,14 @@ tasks:
       - echo "{{.GREETING}}"
     silent: true
 
+  installtools:
+    cmds:
+      # Install task, go, golangci-lint, cloc externally. E.g via asdf. the needed versions are pinned in .tool-versions file.
+      - go install golang.org/x/tools/gopls@v0.20.0
+      - go install github.com/oligot/go-mod-upgrade@v0.12.0
+      - go install github.com/kisielk/godepgraph@v1.0.0
+      - go install github.com/ppipada/refdir@v0.7.0
+
   cloc:
     cmds:
       - |
@@ -37,7 +45,6 @@ tasks:
 
   lint-gosort:
     cmds:
-      # Use the override of the original refdir at github.com/ppipada/refdir. Do a go get before.
       - refdir ./...
 
   lint:
