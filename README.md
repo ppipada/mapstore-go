@@ -27,8 +27,12 @@ MapStore is a local, filesystem‑backed map database with pluggable codecs (JSO
 - **Partitioning**
   - _Month based partitioning_ - use the inbuilt `dirpartition.MonthPartitionProvider` to split files across month based directories.
   - Swap in your own `PartitionProvider` to control directory layout.
+- **File change events**
+  - Custom listeners can be plugged into `filestore` to observe file events.
+  - Pluggable _Full text search_
+    - Inbuilt, pure go, sqlite backed (via [glebarez driver](https://github.com/glebarez/go-sqlite) + [modernc sqlite](https://pkg.go.dev/modernc.org/sqlite)), fts engine.
+    - Pluggable iterator utility `ftsengine.SyncIterToFTS` for efficient, incremental index updates.
 - **File naming** - implement `filenameprovider.Provider` or use the provided UUIDv7-based default to keep file names collision-free.
-- **Full text sync** - plug custom iterators into `ftsengine.SyncIterToFTS` for efficient, incremental index updates.
 
 ## Installation
 
