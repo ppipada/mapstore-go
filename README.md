@@ -19,20 +19,32 @@ MapStore is a local, filesystem‑backed map database with pluggable codecs (JSO
 ## Capabilities and Extensibility
 
 - **File encoders**
-  - _JSON file encode/decode_ - use the inbuilt `encdecjson.JSONEncoderDecoder` to encode/decode files as JSON.
+
   - Supply your own `IOEncoderDecoder` via `WithFileEncoderDecoder`.
+  - _JSON file encode/decode_ - use the inbuilt `encdecjson.JSONEncoderDecoder` to encode/decode files as JSON.
+
 - **Encode key or value at sub-path**
-  - _Value encryption_ - use the inbuilt `encdeckeyring.EncryptedStringValueEncoderDecoder` to transparently store sensitive string values through the OS keyring.
+
   - Override encoding of specific keys or values with `WithKeyEncDecGetter` or `WithValueEncDecGetter`.
-- **Partitioning**
-  - _Month based partitioning_ - use the inbuilt `dirpartition.MonthPartitionProvider` to split files across month based directories.
+  - _Value encryption_ - use the inbuilt `encdeckeyring.EncryptedStringValueEncoderDecoder` to transparently store sensitive string values through the OS keyring.
+
+- **Directory Partitioning**
+
   - Swap in your own `PartitionProvider` to control directory layout.
+  - _Month based partitioning_ - use the inbuilt `dirpartition.MonthPartitionProvider` to split files across month based directories.
+
+- **File naming**
+
+  - Filestore is opaque to filenames, allowing for any naming scheme.
+  - Dirstore uses a `FileKey` based design to allow for control of encoding and decoding of data inside file names for efficient traversal.
+  - _UUIDv7 based filename provider_ - use the inbuilt UUIDv7 based provider to derive and use, collision free and semantic data based filenames.
+
 - **File change events**
+
   - Custom listeners can be plugged into `filestore` to observe file events.
   - Pluggable _Full text search_
     - Inbuilt, pure go, sqlite backed (via [glebarez driver](https://github.com/glebarez/go-sqlite) + [modernc sqlite](https://pkg.go.dev/modernc.org/sqlite)), fts engine.
     - Pluggable iterator utility `ftsengine.SyncIterToFTS` for efficient, incremental index updates.
-- **File naming** - implement `filenameprovider.Provider` or use the provided UUIDv7-based default to keep file names collision-free.
 
 ## Installation
 
