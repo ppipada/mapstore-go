@@ -119,16 +119,23 @@ func (e *errorReader) Read(p []byte) (n int, err error) {
 }
 
 func TestDecodeWithErrorReader(t *testing.T) {
-	encoderDecoder := EncryptedStringValueEncoderDecoder{}
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	if err != nil {
+		t.Fatalf("getEncoderDecoder failed: %v", err)
+	}
 	var v string
 	r := &errorReader{}
-	err := encoderDecoder.Decode(r, &v)
+	err = encoderDecoder.Decode(r, &v)
 	if err == nil {
 		t.Errorf("Expected error when decoding with erroring reader, but got none")
 	}
 }
 
 func TestDecryptInvalidBase64(t *testing.T) {
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	if err != nil {
+		t.Fatalf("getEncoderDecoder failed: %v", err)
+	}
 	invalidBase64Inputs := []string{
 		"!!! not base64 !!!",
 		"",
@@ -139,7 +146,7 @@ func TestDecryptInvalidBase64(t *testing.T) {
 
 	for _, input := range invalidBase64Inputs {
 		t.Run("Invalid base64 input", func(t *testing.T) {
-			_, err := decryptString(input)
+			_, err := encoderDecoder.decryptString(input)
 			if err == nil {
 				t.Errorf(
 					"Expected error when decrypting invalid base64 input '%s', but got none",
@@ -151,7 +158,11 @@ func TestDecryptInvalidBase64(t *testing.T) {
 }
 
 func TestDecryptCiphertextTooShort(t *testing.T) {
-	key, err := getKey()
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	if err != nil {
+		t.Fatalf("getEncoderDecoder failed: %v", err)
+	}
+	key, err := encoderDecoder.getKey()
 	if err != nil {
 		t.Fatalf("getKey failed: %v", err)
 	}
@@ -171,15 +182,19 @@ func TestDecryptCiphertextTooShort(t *testing.T) {
 	shortCiphertext := make([]byte, nonceSize-1)
 
 	encoded := base64.StdEncoding.EncodeToString(shortCiphertext)
-	_, err = decryptString(encoded)
+	_, err = encoderDecoder.decryptString(encoded)
 	if err == nil || err.Error() != "ciphertext too short" {
 		t.Errorf("Expected 'ciphertext too short' error, but got %v", err)
 	}
 }
 
 func TestDecryptInvalidCiphertext(t *testing.T) {
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	if err != nil {
+		t.Fatalf("getEncoderDecoder failed: %v", err)
+	}
 	originalValue := "This is a test"
-	encrypted, err := encryptString(originalValue)
+	encrypted, err := encoderDecoder.encryptString(originalValue)
 	if err != nil {
 		t.Fatalf("encryptString failed: %v", err)
 	}
@@ -196,22 +211,26 @@ func TestDecryptInvalidCiphertext(t *testing.T) {
 	}
 
 	tamperedEncrypted := base64.StdEncoding.EncodeToString(data)
-	_, err = decryptString(tamperedEncrypted)
+	_, err = encoderDecoder.decryptString(tamperedEncrypted)
 	if err == nil {
 		t.Errorf("Expected error when decrypting invalid ciphertext, but got none")
 	}
 }
 
 func TestEncryptDecryptConsistency(t *testing.T) {
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	if err != nil {
+		t.Fatalf("getEncoderDecoder failed: %v", err)
+	}
 	// Ensure that encrypting the same plaintext produces different ciphertexts due to randomness in nonce.
 	plaintext := "Consistent plaintext"
 
-	encrypted1, err := encryptString(plaintext)
+	encrypted1, err := encoderDecoder.encryptString(plaintext)
 	if err != nil {
 		t.Fatalf("encryptString failed: %v", err)
 	}
 
-	encrypted2, err := encryptString(plaintext)
+	encrypted2, err := encoderDecoder.encryptString(plaintext)
 	if err != nil {
 		t.Fatalf("encryptString failed: %v", err)
 	}
@@ -224,12 +243,15 @@ func TestEncryptDecryptConsistency(t *testing.T) {
 }
 
 func TestDecodeWithInterface(t *testing.T) {
-	encoderDecoder := EncryptedStringValueEncoderDecoder{}
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	if err != nil {
+		t.Fatalf("getEncoderDecoder failed: %v", err)
+	}
 
 	// Prepare a valid encoded string.
 	originalValue := "Test string for interface"
 	encodedBuffer := &bytes.Buffer{}
-	err := encoderDecoder.Encode(encodedBuffer, originalValue)
+	err = encoderDecoder.Encode(encodedBuffer, originalValue)
 	if err != nil {
 		t.Fatalf("Encode failed: %v", err)
 	}
@@ -256,12 +278,15 @@ func TestDecodeWithInterface(t *testing.T) {
 }
 
 func TestDecodeWithNonStringInterface(t *testing.T) {
-	encoderDecoder := EncryptedStringValueEncoderDecoder{}
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	if err != nil {
+		t.Fatalf("getEncoderDecoder failed: %v", err)
+	}
 
 	// Prepare a valid encoded string.
 	originalValue := "Test string for non-string interface"
 	encodedBuffer := &bytes.Buffer{}
-	err := encoderDecoder.Encode(encodedBuffer, originalValue)
+	err = encoderDecoder.Encode(encodedBuffer, originalValue)
 	if err != nil {
 		t.Fatalf("Encode failed: %v", err)
 	}
@@ -276,12 +301,15 @@ func TestDecodeWithNonStringInterface(t *testing.T) {
 }
 
 func TestDecodeWithNilInterface(t *testing.T) {
-	encoderDecoder := EncryptedStringValueEncoderDecoder{}
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	if err != nil {
+		t.Fatalf("getEncoderDecoder failed: %v", err)
+	}
 
 	// Prepare a valid encoded string.
 	originalValue := "Test string for nil interface"
 	encodedBuffer := &bytes.Buffer{}
-	err := encoderDecoder.Encode(encodedBuffer, originalValue)
+	err = encoderDecoder.Encode(encodedBuffer, originalValue)
 	if err != nil {
 		t.Fatalf("Encode failed: %v", err)
 	}

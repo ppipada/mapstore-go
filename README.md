@@ -16,14 +16,17 @@ MapStore is a local, filesystem‑backed map database with pluggable codecs (JSO
 
 - Pure Go implementation with no cgo, compatible with Go 1.25+.
 
-## Extensibility Highlights
+## Capabilities and Extensibility
 
-- **File encoders** - supply your own `IOEncoderDecoder` via `WithFileEncoderDecoder`.
+- **File encoders**
   - _JSON file encode/decode_ - use the inbuilt `encdecjson.JSONEncoderDecoder` to encode/decode files as JSON.
-- **Encode key or value at sub-path** - override encoding of specific keys or values with `WithKeyEncDecGetter` or `WithValueEncDecGetter`.
+  - Supply your own `IOEncoderDecoder` via `WithFileEncoderDecoder`.
+- **Encode key or value at sub-path**
   - _Value encryption_ - use the inbuilt `encdeckeyring.EncryptedStringValueEncoderDecoder` to transparently store sensitive string values through the OS keyring.
-- **Partitioning** - swap in your own `PartitionProvider` to control directory layout.
+  - Override encoding of specific keys or values with `WithKeyEncDecGetter` or `WithValueEncDecGetter`.
+- **Partitioning**
   - _Month based partitioning_ - use the inbuilt `dirpartition.MonthPartitionProvider` to split files across month based directories.
+  - Swap in your own `PartitionProvider` to control directory layout.
 - **File naming** - implement `filenameprovider.Provider` or use the provided UUIDv7-based default to keep file names collision-free.
 - **Full text sync** - plug custom iterators into `ftsengine.SyncIterToFTS` for efficient, incremental index updates.
 

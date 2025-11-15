@@ -13,15 +13,50 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
-// EncryptedStringValueEncoderDecoder uses your encryption for encoding/decoding.
-type EncryptedStringValueEncoderDecoder struct{}
+// EncryptedStringValueEncoderDecoder uses AES-256-GCM + base64 for encoding/decoding
+// and persists the AES key in the OS keyring under the configured service/username.
+type EncryptedStringValueEncoderDecoder struct {
+	service  string
+	username string
+	debug    bool
+}
 
-func (e EncryptedStringValueEncoderDecoder) Encode(w io.Writer, value any) error {
+// Option is a functional option for configuring EncryptedStringValueEncoderDecoder.
+type Option func(*EncryptedStringValueEncoderDecoder)
+
+// WithDebug sets debug mode.
+func WithDebug(debug bool) Option {
+	return func(e *EncryptedStringValueEncoderDecoder) {
+		e.debug = debug
+	}
+}
+
+// NewEncryptedStringValueEncoderDecoder constructs a new instance.
+func NewEncryptedStringValueEncoderDecoder(
+	service, username string,
+	opts ...Option,
+) (*EncryptedStringValueEncoderDecoder, error) {
+	if service == "" || username == "" {
+		return nil, errors.New("empty service or username")
+	}
+	e := &EncryptedStringValueEncoderDecoder{
+		service:  service,
+		username: username,
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(e)
+		}
+	}
+	return e, nil
+}
+
+func (e *EncryptedStringValueEncoderDecoder) Encode(w io.Writer, value any) error {
 	v, ok := value.(string)
 	if !ok {
 		return errors.New("got non string encode input")
 	}
-	encryptedData, err := encryptString(v)
+	encryptedData, err := e.encryptString(v)
 	if err != nil {
 		return err
 	}
@@ -30,13 +65,13 @@ func (e EncryptedStringValueEncoderDecoder) Encode(w io.Writer, value any) error
 	return err
 }
 
-func (e EncryptedStringValueEncoderDecoder) Decode(r io.Reader, value any) error {
+func (e *EncryptedStringValueEncoderDecoder) Decode(r io.Reader, value any) error {
 	encryptedData, err := io.ReadAll(r)
 	if err != nil {
 		return err
 	}
 
-	decryptedData, err := decryptString(string(encryptedData))
+	decryptedData, err := e.decryptString(string(encryptedData))
 	if err != nil {
 		return err
 	}
@@ -73,8 +108,8 @@ func (e EncryptedStringValueEncoderDecoder) Decode(r io.Reader, value any) error
 }
 
 // encryptString encrypts a string using AES-256-GCM and returns a base64-encoded string.
-func encryptString(plaintext string) (string, error) {
-	key, err := getKey()
+func (e *EncryptedStringValueEncoderDecoder) encryptString(plaintext string) (string, error) {
+	key, err := e.getKey()
 	if err != nil {
 		return "", err
 	}
@@ -100,8 +135,8 @@ func encryptString(plaintext string) (string, error) {
 }
 
 // decryptString decrypts a base64-encoded string that was encrypted using AES-256-GCM.
-func decryptString(encodedCiphertext string) (string, error) {
-	key, err := getKey()
+func (e *EncryptedStringValueEncoderDecoder) decryptString(encodedCiphertext string) (string, error) {
+	key, err := e.getKey()
 	if err != nil {
 		return "", err
 	}
@@ -137,22 +172,22 @@ func decryptString(encodedCiphertext string) (string, error) {
 
 // getKey retrieves or generates an AES-256 encryption key from the keyring.
 // If the key does not exist, it generates a new one, stores it, and returns it.
-func getKey() ([]byte, error) {
-	const (
-		service = "FlexiGPTKeyRingEncDec"
-		user    = "user"
-		// AES-256 requires a 32-byte key.
-		keySize = 32
-	)
+func (e *EncryptedStringValueEncoderDecoder) getKey() ([]byte, error) {
+	// AES-256 requires a 32-byte key.
+	const keySize = 32
 
 	// Attempt to retrieve the key from the keyring.
-	keyStr, err := keyring.Get(service, user)
+	keyStr, err := keyring.Get(e.service, e.username)
+
 	switch {
 	case err == nil:
 		// Decode the base64-encoded key.
 		key, err := base64.StdEncoding.DecodeString(keyStr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode key: %w", err)
+		}
+		if len(key) != keySize {
+			return nil, fmt.Errorf("unexpected key length: got %d, want %d", len(key), keySize)
 		}
 		return key, nil
 	case errors.Is(err, keyring.ErrNotFound):
@@ -163,7 +198,7 @@ func getKey() ([]byte, error) {
 		}
 		// Store the key in the keyring.
 		keyStr := base64.StdEncoding.EncodeToString(key)
-		if err := keyring.Set(service, user, keyStr); err != nil {
+		if err := keyring.Set(e.service, e.username, keyStr); err != nil {
 			return nil, fmt.Errorf("failed to store key in keyring: %w", err)
 		}
 		return key, nil

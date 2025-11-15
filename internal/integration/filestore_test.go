@@ -118,10 +118,19 @@ func TestMapFileStore_SetKey_GetKey(t *testing.T) {
 	filename := filepath.Join(tempDir, "teststore.json")
 	defaultData := map[string]any{"foo": "bar"}
 
+	encoderDecoder1, err := encdeckeyring.NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user1")
+	if err != nil {
+		t.Fatalf("getEncoderDecoder failed: %v", err)
+	}
+	encoderDecoder2, err := encdeckeyring.NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user2")
+	if err != nil {
+		t.Fatalf("getEncoderDecoder failed: %v", err)
+	}
+
 	// Example: We'll return an EncoderDecoder for the paths "foo" and "parent.child".
 	valueEncDecs := map[string]mapstore.IOEncoderDecoder{
-		"foo":          encdeckeyring.EncryptedStringValueEncoderDecoder{},
-		"parent.child": encdeckeyring.EncryptedStringValueEncoderDecoder{},
+		"foo":          encoderDecoder1,
+		"parent.child": encoderDecoder2,
 	}
 
 	store, err := mapstore.NewMapFileStore(
