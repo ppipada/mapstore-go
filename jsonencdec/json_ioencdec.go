@@ -1,4 +1,4 @@
-package encdecjson
+package jsonencdec
 
 import (
 	"encoding/json"

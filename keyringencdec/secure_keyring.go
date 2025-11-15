@@ -1,4 +1,4 @@
-package encdeckeyring
+package keyringencdec
 
 import (
 	"crypto/aes"

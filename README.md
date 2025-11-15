@@ -21,12 +21,12 @@ MapStore is a local, filesystem‑backed map database with pluggable codecs (JSO
 - **File encoders**
 
   - Supply your own `IOEncoderDecoder` via `WithFileEncoderDecoder`.
-  - _JSON file encode/decode_ - use the inbuilt `encdecjson.JSONEncoderDecoder` to encode/decode files as JSON.
+  - _JSON file encode/decode_ - use the inbuilt `jsonencdec.JSONEncoderDecoder` to encode/decode files as JSON.
 
 - **Encode key or value at sub-path**
 
   - Override encoding of specific keys or values with `WithKeyEncDecGetter` or `WithValueEncDecGetter`.
-  - _Value encryption_ - use the inbuilt `encdeckeyring.EncryptedStringValueEncoderDecoder` to transparently store sensitive string values through the OS keyring.
+  - _Value encryption_ - use the inbuilt `keyringencdec.EncryptedStringValueEncoderDecoder` to transparently store sensitive string values through the OS keyring.
 
 - **Directory Partitioning**
 

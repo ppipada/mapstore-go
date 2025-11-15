@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/ppipada/mapstore-go"
-	"github.com/ppipada/mapstore-go/encdecjson"
-	"github.com/ppipada/mapstore-go/encdeckeyring"
 	"github.com/ppipada/mapstore-go/internal/encdecutil"
+	"github.com/ppipada/mapstore-go/jsonencdec"
+	"github.com/ppipada/mapstore-go/keyringencdec"
 )
 
 func TestNewMapFileStore(t *testing.T) {
@@ -94,7 +94,7 @@ func TestNewMapFileStore(t *testing.T) {
 			}()
 		}
 
-		_, err := mapstore.NewMapFileStore(tt.filename, tt.defaultData, encdecjson.JSONEncoderDecoder{}, tt.options...)
+		_, err := mapstore.NewMapFileStore(tt.filename, tt.defaultData, jsonencdec.JSONEncoderDecoder{}, tt.options...)
 		if tt.expectError {
 			if err == nil {
 				t.Errorf("[%s] Expected error but got nil", tt.name)
@@ -118,11 +118,11 @@ func TestMapFileStore_SetKey_GetKey(t *testing.T) {
 	filename := filepath.Join(tempDir, "teststore.json")
 	defaultData := map[string]any{"foo": "bar"}
 
-	encoderDecoder1, err := encdeckeyring.NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user1")
+	encoderDecoder1, err := keyringencdec.NewEncryptedStringValueEncoderDecoder("keyringencdec", "user1")
 	if err != nil {
 		t.Fatalf("getEncoderDecoder failed: %v", err)
 	}
-	encoderDecoder2, err := encdeckeyring.NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user2")
+	encoderDecoder2, err := keyringencdec.NewEncryptedStringValueEncoderDecoder("keyringencdec", "user2")
 	if err != nil {
 		t.Fatalf("getEncoderDecoder failed: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestMapFileStore_SetKey_GetKey(t *testing.T) {
 	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		encdecjson.JSONEncoderDecoder{},
+		jsonencdec.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
 		// New approach: We pass a function that returns an EncoderDecoder depending on pathSoFar.
 		mapstore.WithValueEncDecGetter(func(pathSoFar []string) mapstore.IOEncoderDecoder {
@@ -239,7 +239,7 @@ func TestMapFileStore_DeleteKey(t *testing.T) {
 	store, err := mapstore.NewMapFileStore(
 		filename,
 		initialData,
-		encdecjson.JSONEncoderDecoder{},
+		jsonencdec.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
 	)
 	if err != nil {
@@ -323,7 +323,7 @@ func TestMapFileStore_SetAll_GetAll(t *testing.T) {
 	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		encdecjson.JSONEncoderDecoder{},
+		jsonencdec.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
 		mapstore.WithFileAutoFlush(true),
 	)
@@ -431,7 +431,7 @@ func TestMapFileStore_DeleteAll(t *testing.T) {
 	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		encdecjson.JSONEncoderDecoder{},
+		jsonencdec.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
 	)
 	if err != nil {
@@ -470,7 +470,7 @@ func TestMapFileStore_AutoFlush(t *testing.T) {
 	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		encdecjson.JSONEncoderDecoder{},
+		jsonencdec.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
 		mapstore.WithFileAutoFlush(true),
 	)
@@ -484,7 +484,7 @@ func TestMapFileStore_AutoFlush(t *testing.T) {
 	}
 
 	// Reopen the store.
-	store2, err := mapstore.NewMapFileStore(filename, defaultData, encdecjson.JSONEncoderDecoder{})
+	store2, err := mapstore.NewMapFileStore(filename, defaultData, jsonencdec.JSONEncoderDecoder{})
 	if err != nil {
 		t.Fatalf("Failed to reopen store: %v", err)
 	}
@@ -505,7 +505,7 @@ func TestMapFileStore_NoAutoFlush(t *testing.T) {
 	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		encdecjson.JSONEncoderDecoder{},
+		jsonencdec.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
 		mapstore.WithFileAutoFlush(false),
 	)
@@ -519,7 +519,7 @@ func TestMapFileStore_NoAutoFlush(t *testing.T) {
 	}
 
 	// Reopen the store.
-	store2, err := mapstore.NewMapFileStore(filename, defaultData, encdecjson.JSONEncoderDecoder{})
+	store2, err := mapstore.NewMapFileStore(filename, defaultData, jsonencdec.JSONEncoderDecoder{})
 	if err != nil {
 		t.Fatalf("Failed to reopen store: %v", err)
 	}
@@ -535,7 +535,7 @@ func TestMapFileStore_NoAutoFlush(t *testing.T) {
 		t.Fatalf("Flush failed: %v", err)
 	}
 
-	store3, err := mapstore.NewMapFileStore(filename, defaultData, encdecjson.JSONEncoderDecoder{})
+	store3, err := mapstore.NewMapFileStore(filename, defaultData, jsonencdec.JSONEncoderDecoder{})
 	if err != nil {
 		t.Fatalf("Failed to reopen store after save: %v", err)
 	}
@@ -556,7 +556,7 @@ func TestMapFileStorePermissionErrorCases(t *testing.T) {
 	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		encdecjson.JSONEncoderDecoder{},
+		jsonencdec.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
 	)
 	if err != nil {
@@ -586,7 +586,7 @@ func TestMapFileStorePermissionErrorCases(t *testing.T) {
 		t.Fatalf("Failed to write invalid data to file: %v", err)
 	}
 
-	_, err = mapstore.NewMapFileStore(filename, defaultData, encdecjson.JSONEncoderDecoder{})
+	_, err = mapstore.NewMapFileStore(filename, defaultData, jsonencdec.JSONEncoderDecoder{})
 	if err == nil {
 		t.Errorf("Expected error when loading store from invalid data, but got nil")
 	}
@@ -599,7 +599,7 @@ func TestMapFileStore_NestedStructures(t *testing.T) {
 	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		encdecjson.JSONEncoderDecoder{},
+		jsonencdec.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
 	)
 	if err != nil {
@@ -669,7 +669,7 @@ func TestMapFileStore_NestedStructures(t *testing.T) {
 //  3. Partial path coverage vs. all path coverage, etc.
 func TestMapFileStore_KeyEncodingDecoding(t *testing.T) {
 	tempDir := t.TempDir()
-	filename := filepath.Join(tempDir, "teststore_key_encdecjson.json")
+	filename := filepath.Join(tempDir, "teststore_key_jsonencdec.json")
 
 	// We'll define a function that returns mockB64KeyEncDec for all paths,
 	// i.e. it encodes/decodes every key in the store.
@@ -683,7 +683,7 @@ func TestMapFileStore_KeyEncodingDecoding(t *testing.T) {
 	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		encdecjson.JSONEncoderDecoder{},
+		jsonencdec.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
 		mapstore.WithKeyEncDecGetter(keyEncDecGetter),
 	)
@@ -765,7 +765,7 @@ func TestMapFileStore_KeyEncodingDecoding(t *testing.T) {
 		store2, err := mapstore.NewMapFileStore(
 			filename,
 			defaultData,
-			encdecjson.JSONEncoderDecoder{},
+			jsonencdec.JSONEncoderDecoder{},
 			mapstore.WithKeyEncDecGetter(keyEncDecGetter),
 		)
 		if err != nil {
@@ -807,7 +807,7 @@ func TestMapFileStore_KeyEncodingDecoding(t *testing.T) {
 		_, err = mapstore.NewMapFileStore(
 			filename,
 			defaultData,
-			encdecjson.JSONEncoderDecoder{},
+			jsonencdec.JSONEncoderDecoder{},
 			mapstore.WithKeyEncDecGetter(keyEncDecGetter),
 		)
 		if err == nil {
@@ -822,7 +822,7 @@ func TestMapFileStore_KeyEncodingDecoding(t *testing.T) {
 // We'll ensure that keys are also re-encoded/de-encoded properly when using SetAll.
 func TestMapFileStore_SetAll_KeyEncDec(t *testing.T) {
 	tempDir := t.TempDir()
-	filename := filepath.Join(tempDir, "teststore_setall_keyencdecjson.json")
+	filename := filepath.Join(tempDir, "teststore_setall_keyjsonencdec.json")
 
 	keyEncDecGetter := func(pathSoFar []string) mapstore.StringEncoderDecoder {
 		return encdecutil.Base64StringEncoderDecoder{}
@@ -832,7 +832,7 @@ func TestMapFileStore_SetAll_KeyEncDec(t *testing.T) {
 	store, err := mapstore.NewMapFileStore(
 		filename,
 		defaultData,
-		encdecjson.JSONEncoderDecoder{},
+		jsonencdec.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
 		mapstore.WithKeyEncDecGetter(keyEncDecGetter),
 	)
@@ -1074,7 +1074,7 @@ func openStore(p string, opts ...mapstore.FileOption) *mapstore.MapFileStore {
 	s, err := mapstore.NewMapFileStore(
 		p,
 		map[string]any{},
-		encdecjson.JSONEncoderDecoder{},
+		jsonencdec.JSONEncoderDecoder{},
 		append(opts, mapstore.WithCreateIfNotExists(true))...,
 	)
 	if err != nil {

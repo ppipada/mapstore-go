@@ -58,4 +58,5 @@ tasks:
   lt:
     cmds:
       - task: lint
+      - task: lint-gosort
       - task: test

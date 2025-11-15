@@ -1,4 +1,4 @@
-package encdeckeyring
+package keyringencdec
 
 import (
 	"bytes"
@@ -119,7 +119,7 @@ func (e *errorReader) Read(p []byte) (n int, err error) {
 }
 
 func TestDecodeWithErrorReader(t *testing.T) {
-	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("keyringencdec", "user")
 	if err != nil {
 		t.Fatalf("getEncoderDecoder failed: %v", err)
 	}
@@ -132,7 +132,7 @@ func TestDecodeWithErrorReader(t *testing.T) {
 }
 
 func TestDecryptInvalidBase64(t *testing.T) {
-	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("keyringencdec", "user")
 	if err != nil {
 		t.Fatalf("getEncoderDecoder failed: %v", err)
 	}
@@ -158,7 +158,7 @@ func TestDecryptInvalidBase64(t *testing.T) {
 }
 
 func TestDecryptCiphertextTooShort(t *testing.T) {
-	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("keyringencdec", "user")
 	if err != nil {
 		t.Fatalf("getEncoderDecoder failed: %v", err)
 	}
@@ -189,7 +189,7 @@ func TestDecryptCiphertextTooShort(t *testing.T) {
 }
 
 func TestDecryptInvalidCiphertext(t *testing.T) {
-	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("keyringencdec", "user")
 	if err != nil {
 		t.Fatalf("getEncoderDecoder failed: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestDecryptInvalidCiphertext(t *testing.T) {
 }
 
 func TestEncryptDecryptConsistency(t *testing.T) {
-	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("keyringencdec", "user")
 	if err != nil {
 		t.Fatalf("getEncoderDecoder failed: %v", err)
 	}
@@ -243,7 +243,7 @@ func TestEncryptDecryptConsistency(t *testing.T) {
 }
 
 func TestDecodeWithInterface(t *testing.T) {
-	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("keyringencdec", "user")
 	if err != nil {
 		t.Fatalf("getEncoderDecoder failed: %v", err)
 	}
@@ -278,7 +278,7 @@ func TestDecodeWithInterface(t *testing.T) {
 }
 
 func TestDecodeWithNonStringInterface(t *testing.T) {
-	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("keyringencdec", "user")
 	if err != nil {
 		t.Fatalf("getEncoderDecoder failed: %v", err)
 	}
@@ -301,7 +301,7 @@ func TestDecodeWithNonStringInterface(t *testing.T) {
 }
 
 func TestDecodeWithNilInterface(t *testing.T) {
-	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("encdeckeyring", "user")
+	encoderDecoder, err := NewEncryptedStringValueEncoderDecoder("keyringencdec", "user")
 	if err != nil {
 		t.Fatalf("getEncoderDecoder failed: %v", err)
 	}
